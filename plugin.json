@@ -1,36 +1,26 @@
 {
-  "name": "siyuan-plugin-ai-sidebar",
+  "name": "siyuan-plugin-ai-copilot",
   "author": "Achuan-2",
-  "url": "https://github.com/Achuan-2/siyuan-plugin-ai-sidebar",
-  "version": "0.0.2",
+  "url": "https://github.com/Achuan-2/siyuan-plugin-ai-copilot",
+  "version": "0.0.3",
   "minAppVersion": "3.0.12",
   "backends": [
-    "windows",
-    "linux",
-    "darwin",
-    "docker",
-    "ios",
-    "android",
-    "harmony"
+    "all"
   ],
   "frontends": [
-    "desktop",
-    "mobile",
-    "browser-desktop",
-    "browser-mobile",
-    "desktop-window"
+    "all"
   ],
   "disabledInPublish": true,
   "displayName": {
-    "en_US": "AI Sidebar",
-    "zh_CN": "AI 侧边栏"
+    "default": "AI Copilot",
+    "zh_CN": "AI Copilot"
   },
   "description": {
-    "en_US": "AI assistant for SiYuan Note",
+    "default": "AI assistant for SiYuan Note",
     "zh_CN": "思源笔记 AI 助手"
   },
   "readme": {
-    "en_US": "README.md",
+    "default": "README.md",
     "zh_CN": "README_zh_CN.md"
   },
   "funding": {
@@ -40,20 +30,11 @@
   },
   "keywords": [
     "ai",
+    "copilot",
     "assistant",
     "chatbot",
     "openai",
     "gemini",
-    "deepseek",
-    "multimodal",
-    "vision",
-    "context",
-    "prompt",
-    "AI助手",
-    "聊天机器人",
-    "多模态",
-    "视觉识别",
-    "上下文",
-    "提示词"
+    "deepseek"
   ]
 }
