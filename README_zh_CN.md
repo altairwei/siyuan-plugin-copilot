@@ -10,6 +10,10 @@
 > 如果有需要使用GPT5、Gemini 2.5 Pro、Claude 4.5等顶级模型的朋友
 > - 推荐[V3 API网站](https://api.gpt.ge/register?aff=fQIZ)，非常好用，按量付费，各个AI模型都能使用，比用官方的API能省不少钱，使用我的[邀请链接](https://api.gpt.ge/register?aff=fQIZ)注册可以获得$0.3余额奖励试用。
 
+## 📝更新日志
+
+见[CHANGELOG.md](https://cdn.jsdelivr.net/gh/Achuan-2/siyuan-plugin-copilot@main/CHANGELOG.md)
+
 ## ✨ 核心特性
 
 ### 🤖 多平台 AI 支持

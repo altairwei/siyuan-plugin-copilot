@@ -7,6 +7,10 @@ An AI assistant plugin for SiYuan Note, supporting multiple AI platforms, docume
 > For friends who need to use top-tier models like GPT5, Gemini 2.5 Pro, Claude 4.5
 > - Recommend [V3 API website](https://api.gpt.ge/register?aff=fQIZ), very useful, pay-per-use, can use various AI models, can save a lot compared to official APIs. Register with my [invitation link](https://api.gpt.ge/register?aff=fQIZ) to get $0.3 balance reward for trial.
 
+## 📝CHANGELOG
+
+see [CHANGELOG.md](https://cdn.jsdelivr.net/gh/Achuan-2/siyuan-plugin-copilot@main/CHANGELOG.md)
+
 ## ✨ Core Features
 
 ### 🤖 Multi-Platform AI Support
