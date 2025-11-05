@@ -2,7 +2,7 @@
     import { onMount, tick, onDestroy } from 'svelte';
     import { chat, type Message, type MessageAttachment, type EditOperation } from './ai-chat';
     import type { MessageContent } from './ai-chat';
-    import {getActiveEditor} from 'siyuan';
+    import { getActiveEditor } from 'siyuan';
     import {
         refreshSql,
         pushMsg,
@@ -2056,11 +2056,17 @@
                 }
 
                 // 使用 insertBlock API 插入块
-                const insertResult = await insertBlock('markdown', operation.newContent, nextID, previousID, undefined);
+                const insertResult = await insertBlock(
+                    'markdown',
+                    operation.newContent,
+                    nextID,
+                    previousID,
+                    undefined
+                );
                 await refreshSql();
                 // 获取新插入块的ID（从 doOperations 中获取）
                 const newBlockId = insertResult?.[0]?.doOperations?.[0]?.id;
-                console.log('Inserted new block ID:', newBlockId);  
+                console.log('Inserted new block ID:', newBlockId);
                 // 创建可撤回的事务
                 if (newBlockId) {
                     try {
@@ -2072,10 +2078,10 @@
                             // 获取父块ID
                             const block = await getBlockByID(operation.blockId);
                             const parentID = block?.root_id || currentProtyle.block.id;
-                            const doOperations =[];
+                            const doOperations = [];
                             if (nextID) {
                                 doOperations.push({
-                                    action: "insert",
+                                    action: 'insert',
                                     id: newBlockId,
                                     data: newBlockDom,
                                     parentID: parentID,
@@ -2083,7 +2089,7 @@
                                 });
                             } else {
                                 doOperations.push({
-                                    action: "insert",
+                                    action: 'insert',
                                     id: newBlockId,
                                     data: newBlockDom,
                                     parentID: parentID,
@@ -2091,11 +2097,13 @@
                                 });
                             }
 
-                            const undoOperations = [{
-                                action: "delete",
-                                id: newBlockId,
-                                data: null,
-                            }];
+                            const undoOperations = [
+                                {
+                                    action: 'delete',
+                                    id: newBlockId,
+                                    data: null,
+                                },
+                            ];
 
                             // 执行事务以支持撤回
                             currentProtyle.getInstance().transaction(doOperations, undoOperations);
@@ -2135,7 +2143,7 @@
                 }
 
                 // 保存旧的DOM用于撤回操作
-                const oldBlockDomRes =await getBlockDOM(operation.blockId);
+                const oldBlockDomRes = await getBlockDOM(operation.blockId);
 
                 // 使用 updateBlock API 更新块内容
                 await updateBlock('markdown', operation.newContent, operation.blockId);
@@ -3372,17 +3380,24 @@
                     {#if currentDiffOperation.operationType === 'insert'}
                         <!-- 插入操作：只显示新内容 -->
                         <div class="ai-sidebar__diff-content">
-                            <div class="ai-sidebar__diff-split-header" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
+                            <div
+                                class="ai-sidebar__diff-split-header"
+                                style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;"
+                            >
                                 <span>{t('aiSidebar.edit.insertContent')}</span>
                                 <button
                                     class="b3-button b3-button--text b3-button--small"
                                     on:click={() => {
-                                        navigator.clipboard.writeText(currentDiffOperation.newContent);
+                                        navigator.clipboard.writeText(
+                                            currentDiffOperation.newContent
+                                        );
                                         pushMsg(t('aiSidebar.success.copySuccess'));
                                     }}
                                     title={t('aiSidebar.actions.copyNewContent')}
                                 >
-                                    <svg class="b3-button__icon"><use xlink:href="#iconCopy"></use></svg>
+                                    <svg class="b3-button__icon">
+                                        <use xlink:href="#iconCopy"></use>
+                                    </svg>
                                     {t('aiSidebar.actions.copy')}
                                 </button>
                             </div>
@@ -3397,23 +3412,31 @@
                                 <button
                                     class="b3-button b3-button--text b3-button--small"
                                     on:click={() => {
-                                        navigator.clipboard.writeText(currentDiffOperation.oldContent);
+                                        navigator.clipboard.writeText(
+                                            currentDiffOperation.oldContent
+                                        );
                                         pushMsg(t('aiSidebar.success.copySuccess'));
                                     }}
                                     title={t('aiSidebar.actions.copyOldContent')}
                                 >
-                                    <svg class="b3-button__icon"><use xlink:href="#iconCopy"></use></svg>
+                                    <svg class="b3-button__icon">
+                                        <use xlink:href="#iconCopy"></use>
+                                    </svg>
                                     {t('aiSidebar.actions.copyBefore')}
                                 </button>
                                 <button
                                     class="b3-button b3-button--text b3-button--small"
                                     on:click={() => {
-                                        navigator.clipboard.writeText(currentDiffOperation.newContent);
+                                        navigator.clipboard.writeText(
+                                            currentDiffOperation.newContent
+                                        );
                                         pushMsg(t('aiSidebar.success.copySuccess'));
                                     }}
                                     title={t('aiSidebar.actions.copyNewContent')}
                                 >
-                                    <svg class="b3-button__icon"><use xlink:href="#iconCopy"></use></svg>
+                                    <svg class="b3-button__icon">
+                                        <use xlink:href="#iconCopy"></use>
+                                    </svg>
                                     {t('aiSidebar.actions.copyAfter')}
                                 </button>
                             </div>
@@ -3442,12 +3465,16 @@
                                         <button
                                             class="b3-button b3-button--text b3-button--small"
                                             on:click={() => {
-                                                navigator.clipboard.writeText(currentDiffOperation.oldContent);
+                                                navigator.clipboard.writeText(
+                                                    currentDiffOperation.oldContent
+                                                );
                                                 pushMsg(t('aiSidebar.success.copySuccess'));
                                             }}
                                             title={t('aiSidebar.actions.copyOldContent')}
                                         >
-                                            <svg class="b3-button__icon"><use xlink:href="#iconCopy"></use></svg>
+                                            <svg class="b3-button__icon">
+                                                <use xlink:href="#iconCopy"></use>
+                                            </svg>
                                         </button>
                                     </div>
                                     <pre
@@ -3459,12 +3486,16 @@
                                         <button
                                             class="b3-button b3-button--text b3-button--small"
                                             on:click={() => {
-                                                navigator.clipboard.writeText(currentDiffOperation.newContent);
+                                                navigator.clipboard.writeText(
+                                                    currentDiffOperation.newContent
+                                                );
                                                 pushMsg(t('aiSidebar.success.copySuccess'));
                                             }}
                                             title={t('aiSidebar.actions.copyNewContent')}
                                         >
-                                            <svg class="b3-button__icon"><use xlink:href="#iconCopy"></use></svg>
+                                            <svg class="b3-button__icon">
+                                                <use xlink:href="#iconCopy"></use>
+                                            </svg>
                                         </button>
                                     </div>
                                     <pre
