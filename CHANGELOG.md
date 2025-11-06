@@ -1,5 +1,20 @@
+
+## v0.1.2 / 20251106
+
+- 以/结尾忽略v1版本，以# 强制使用输入地址实现逻辑优化
+
+  - 输入https/
+      text.pollinations.ai/openai/，应该用https://text.pollinations.ai/openai/models进
+      型搜索，以及https://text.pollinations.ai/openai/chat/completions进行聊天
+  - 输入https/
+      text.pollinations.ai/openai#，应该用https://text.pollinations.ai/openai进
+      型搜索，以及https://text.pollinations.ai/openai进行聊天
+
+
 ## v0.1.1 / 20251106
 - ⌥⌘C(Ctrl+Alt+C) 快捷键打开AI聊天窗口
+
+ 
 
 ## v0.1.0 / 20251106
 
