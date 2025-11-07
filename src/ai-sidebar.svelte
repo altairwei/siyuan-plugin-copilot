@@ -243,6 +243,8 @@
         document.addEventListener('click', handleClickOutside);
         // 添加全局滚动事件监听器以关闭右键菜单
         document.addEventListener('scroll', closeContextMenu, true);
+        // 添加全局复制事件监听器
+        document.addEventListener('copy', handleCopyEvent);
     });
 
     onDestroy(async () => {
@@ -255,6 +257,8 @@
         document.removeEventListener('click', handleClickOutside);
         // 移除全局滚动事件监听器
         document.removeEventListener('scroll', closeContextMenu, true);
+        // 移除全局复制事件监听器
+        document.removeEventListener('copy', handleCopyEvent);
 
         // 保存工具配置
         if (isToolConfigLoaded) {
@@ -2338,6 +2342,69 @@
                 pushErrMsg(t('aiSidebar.errors.copyFailed'));
                 console.error('Copy failed:', err);
             });
+    }
+
+    // 处理复制事件，将选中的HTML内容转换为Markdown
+    function handleCopyEvent(event: ClipboardEvent) {
+        // 获取选区
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed) {
+            return; // 没有选中内容，不处理
+        }
+
+        // 检查选区是否在消息容器内
+        const range = selection.getRangeAt(0);
+        const container = range.commonAncestorContainer;
+        
+        // 查找最近的 .protyle-wysiwyg 父元素
+        let element: HTMLElement | null = 
+            container.nodeType === Node.ELEMENT_NODE 
+                ? container as HTMLElement 
+                : container.parentElement;
+        
+        let isInMessageContent = false;
+        while (element) {
+            if (element.classList && element.classList.contains('protyle-wysiwyg')) {
+                isInMessageContent = true;
+                break;
+            }
+            element = element.parentElement;
+        }
+
+        // 如果不在消息内容区域，不处理
+        if (!isInMessageContent) {
+            return;
+        }
+
+        // 阻止默认复制行为
+        event.preventDefault();
+
+        try {
+            // 获取选中内容的HTML
+            const div = document.createElement('div');
+            div.appendChild(range.cloneContents());
+            const html = div.innerHTML;
+
+            // 使用思源的 Lute 将 HTML 转换为 Markdown
+            if (window.Lute) {
+                const lute = window.Lute.New();
+                const markdown = lute.BlockDOM2Md(html);
+
+                // 将Markdown写入剪贴板
+                event.clipboardData?.setData('text/plain', markdown);
+                
+                console.log('Copied as Markdown:', markdown);
+            } else {
+                // 降级：如果Lute不可用，使用纯文本
+                const text = selection.toString();
+                event.clipboardData?.setData('text/plain', text);
+            }
+        } catch (error) {
+            console.error('Copy event handler error:', error);
+            // 出错时使用默认行为（纯文本）
+            const text = selection.toString();
+            event.clipboardData?.setData('text/plain', text);
+        }
     }
 
     // 处理消息框右键菜单
