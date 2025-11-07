@@ -77,38 +77,74 @@ export const AVAILABLE_TOOLS: Tool[] = [
         type: 'function',
         function: {
             name: 'siyuan_sql_query',
-            description: `执行思源笔记SQL查询的工具。
+            description: `# siyuan_sql_query
 
-**何时使用**：
+执行思源笔记SQL查询的工具。
+
+## 何时使用
 - 需要搜索、统计或分析笔记内容
 - 查找特定条件的块、文档
 - 获取笔记的元数据信息
 
-**数据库表结构**：
-- blocks表：存储所有块信息
-  - id: 块ID
-  - parent_id: 父块ID
-  - root_id: 文档块ID
-  - hash: 内容哈希
-  - box: 笔记本ID
-  - path: 文档路径
-  - hpath: 人类可读路径
-  - name: 块命名
-  - alias: 块别名
-  - memo: 块备注
-  - tag: 标签
-  - content: 块内容（纯文本）
-  - fcontent: 第一个子块内容
-  - markdown: markdown内容
-  - length: 内容长度
-  - type: 块类型（d=文档,h=标题,p=段落,l=列表等）
-  - subtype: 块子类型
-  - ial: 内联属性列表
-  - sort: 排序权重
-  - created: 创建时间
-  - updated: 更新时间
+## 数据库表结构
 
-**查询示例**：
+### blocks表：存储所有块信息
+| 字段名 | 说明     | 字段值示例 |
+| -------- | ---------------------------------------------------- | ------------ |
+| id       | 内容块 ID| 20210104091228-d0rzbmm  |
+| parent_id       | 上级块的 ID，文档块该字段为空      | 20200825162036-4dx365o   |
+| root_id       | 顶层块的 ID，即文档块 ID   | 20200825162036-4dx365o   |
+| hash       | content 字段的 SHA256 校验和      | a75d25c   |
+| box       | 笔记本 ID| 20210808180117-czj9bvb   |
+| path       | 内容块所在文档路径| /20200812220555-lj3enxa/20210808180320-abz7w6k/20200825162036-4dx365o.sy   |
+| hpath       | 人类可读的内容块所在文档路径       | /0 请从这里开始/编辑器/排版元素   |
+| name       | 内容块名称| 一级标题命名   |
+| alias       | 内容块别名| 一级标题别名   |
+| memo       | 内容块备注| 一级标题备注   |
+| tag       | 非文档块为块内包含的标签，文档块为文档的标签       | #标签1# #标签2# #标签3#   |
+| content       | 去除了 Markdown 标记符的文本       | 一级标题   |
+| fcontent       | 第一个子块去除了 Markdown 标记符的文本(1.9.9 添加) | 第一个子块   |
+| markdown       | 包含完整 Markdown 标记符的文本     | # 一级标题   |
+| length       | fcontent 字段文本长度     | 6   |
+| type       | 内容块主类型，参考 [blocks.type](#blocks-type)| h   |
+| subtype       | 内容块次类型，参考 [blocks.subtype](#blocks-type)| h1   |
+| ial       | 内联属性列表，形如 {: name="value"}| {: id="20210104091228-d0rzbmm" updated="20210604222535"}   |
+| sort       | 排序权重，数值越小排序越靠前       | 5   |
+| created       | 创建时间 | 20210104091228   |
+| updated       | 更新时间 | 20210604222535   |
+
+### refs表：存储所有引用双链结构
+
+| 字段名 | 说明 | 字段值示例 |
+| --- | --- | --- |
+| id | 引用 ID | 20211127144458-idb32wk |
+| def_block_id | 被引用块的块 ID | 20200925095848-aon4lem |
+| def_block_parent_id | 被引用块的双亲节点的块 ID | 20200905090211-2vixtlf |
+| def_block_root_id | 被引用块所在文档的 ID | 20200905090211-2vixtlf |
+| def_block_path | 被引用块所在文档的路径 | /20200812220555-lj3enxa/20210808180320-fqgskfj/20200905090211-2vixtlf.sy |
+| block_id | 引用所在内容块 ID | 20210104090624-c5bu25o |
+| root_id | 引用所在文档块 ID | 20200905090211-2vixtlf |
+| box | 引用所在笔记本 ID | 20210808180117-czj9bvb |
+| path | 引用所在文档块路径 | /20200812220555-lj3enxa/20210808180320-fqgskfj/20200905090211-2vixtlf.sy |
+| content | 引用锚文本 | 元类型 |
+| markdown | 包含完整 Markdown 标记符的文本 | (()) |
+| type | 引用类型 | ref_id |
+
+### attributes表：查询特定块属性
+
+| 字段名 | 说明 | 字段值示例 |
+| --- | --- | --- |
+| id | 属性 ID | 20211127144458-h7y55zu |
+| name | 属性名称 | bookmark |
+| value | 属性值 | ✨ |
+| type | 类型 | b |
+| block_id | 块 ID | 20210428212840-859h45j |
+| root_id | 文档 ID | 20200812220555-lj3enxa |
+| box | 笔记本 ID | 20210808180117-czj9bvb |
+| path | 文档文件路径 | /20200812220555-lj3enxa.sy |
+
+## 查询示例
+
 \`\`\`sql
 -- 搜索包含关键词的文档，为了查找更相关的结果，需要思考不同词，一起查询
 SELECT * FROM blocks WHERE content LIKE '%关键词%' AND type='d' LIMIT 10;
@@ -123,7 +159,7 @@ SELECT COUNT(*) FROM blocks WHERE box='20210808180117-6v0mkxr' AND type='d';
 SELECT * FROM blocks WHERE tag LIKE '%标签名%';
 \`\`\`
 
-**注意事项**：
+## 注意事项
 - 避免查询过多数据，使用LIMIT限制结果数量，默认50，除非用户有要求指定数量
 - 使用索引字段（id, type, box）可以提高查询效率
 `,
@@ -144,24 +180,26 @@ SELECT * FROM blocks WHERE tag LIKE '%标签名%';
         type: 'function',
         function: {
             name: 'siyuan_update_block',
-            description: `更新思源笔记中已存在块的工具。
+            description: `# siyuan_update_block
 
-**何时使用**：
+更新思源笔记中已存在块的工具。
+
+## 何时使用
 - 需要修改现有笔记内容
 - 用户要求更新某个特定的块
 - 修正或改进已有信息
 
-**使用方法**：
+## 使用方法
 1. 先通过SQL查询或其他方式获取要更新的块ID
 2. 准备新的内容（Markdown格式）
 3. 调用工具更新块内容
 
-**更新策略**：
+## 更新策略
 - 完全替换：新内容会完全替换旧内容
 - 保留结构：尽量保持原有的块结构和子块
 - 属性保留：块属性（如别名、标签）会被保留
 
-**注意事项**：
+## 注意事项
 - 必须提供准确的块ID
 - 思源笔记kramdown格式如果要添加颜色：应该是<span data-type="text">添加颜色的文字1</span>{: style="color: var(--b3-font-color1);"}，优先使用以下颜色变量：
   - --b3-font-color1: 红色
@@ -196,29 +234,31 @@ SELECT * FROM blocks WHERE tag LIKE '%标签名%';
         type: 'function',
         function: {
             name: 'siyuan_insert_block',
-            description: `在思源笔记中插入新块的工具。
+            description: `# siyuan_insert_block
 
-**何时使用**：
+在思源笔记中插入新块的工具。
+
+## 何时使用
 - 用户要求添加新内容到笔记
 - 需要在特定位置插入信息
 - 创建新的笔记内容
 
-**使用方法**：
+## 使用方法
 1. 使用markdown格式准备要插入的内容
 2. 确定插入位置（在某个块之前、之后，或作为子块）
 3. 调用工具插入内容
 
-**位置参数说明**：
+## 位置参数说明
 - parentID: 将新块作为指定块的子块插入
 - previousID: 在指定块之后插入新块
 - nextID: 在指定块之前插入新块
 
-**内容格式**：
+## 内容格式
 - 支持完整的Markdown语法
 - 支持思源笔记的扩展语法（如块引用、嵌入块等）
 - 会自动生成块ID
 
-**注意事项**：
+## 注意事项
 - 至少需要指定一个位置参数（parentID、previousID或nextID）
 - 如果指定parentID，会作为子块追加到末尾
 - previousID和nextID用于在同级块中定位
@@ -260,31 +300,33 @@ SELECT * FROM blocks WHERE tag LIKE '%标签名%';
         type: 'function',
         function: {
             name: 'siyuan_get_block_content',
-            description: `获取思源笔记块的详细内容的工具。
+            description: `# siyuan_get_block_content
 
-**何时使用**：
+获取思源笔记块的详细内容的工具。
+
+## 何时使用
 - 需要查看特定块的完整内容
 - 获取块的Markdown或Kramdown源码
 - 分析块的结构和格式
 
-**返回格式**：
+## 返回格式
 支持两种格式：
 1. markdown: 标准Markdown格式，适合阅读
 2. kramdown: 包含块ID信息的格式，适合编程处理
 
-**使用场景**：
+## 使用场景
 - 读取文档内容用于分析或摘要
 - 获取代码块的源代码
 - 提取表格、列表等结构化数据
 - 检查块的引用和链接
 
-**长文档处理**：
+## 长文档处理
 - 对于大型文档，会分块返回内容
 - 每次最多返回1000个块的信息
 - 可以通过多次调用处理完整文档
 - 优先返回最相关的内容部分
 
-**注意事项**：
+## 注意事项
 - 块ID必须存在且有效
 - 返回的内容可能较大，注意token限制
 - Kramdown格式包含额外的元数据`,
@@ -311,27 +353,29 @@ SELECT * FROM blocks WHERE tag LIKE '%标签名%';
         type: 'function',
         function: {
             name: 'siyuan_create_document',
-            description: `在思源笔记中创建新文档的工具。
+            description: `# siyuan_create_document
 
-**何时使用**：
+在思源笔记中创建新文档的工具。
+
+## 何时使用
 - 用户要求创建新笔记
 - 需要基于对话内容生成文档
 - 整理信息并保存为新文档
 
-**文档创建功能**：
+## 文档创建功能
 1. 自动创建层级目录
 2. 支持完整的Markdown格式
 3. 自动处理块引用
 4. 可以在内容中使用关键词自动创建引用
 
-
-**路径格式**：
+## 路径格式
 - 使用 / 分隔的路径，如 /日记/2024/01
 - 不需要包含笔记本ID
 - 会自动创建不存在的父目录
 - 文件名会自动从路径中提取
 
-**使用示例**：
+## 使用示例
+
 \`\`\`javascript
 // 创建日记
 siyuan_create_document({
@@ -348,7 +392,7 @@ siyuan_create_document({
 })
 \`\`\`
 
-**注意事项**：
+## 注意事项
 - 必须提供有效的笔记本ID
 - 路径中的文档如果已存在会报错
 - Markdown内容会被解析并转换为块
@@ -380,26 +424,28 @@ siyuan_create_document({
         type: 'function',
         function: {
             name: 'siyuan_list_notebooks',
-            description: `获取所有笔记本列表的工具。
+            description: `# siyuan_list_notebooks
 
-**何时使用**：
+获取所有笔记本列表的工具。
+
+## 何时使用
 - 需要查看系统中有哪些笔记本
 - 获取笔记本ID用于创建或查询文档
 - 检查笔记本是否存在或已打开
 
-**返回信息**：
+## 返回信息
 - 笔记本ID (id)
 - 笔记本名称 (name)
 - 笔记本图标 (icon)
 - 排序权重 (sort)
 - 是否已关闭 (closed)
 
-**使用场景**：
+## 使用场景
 - 在创建文档前选择目标笔记本
 - 列出可用的笔记本供用户选择
 - 检查笔记本状态
 
-**注意事项**：
+## 注意事项
 - 返回包括已打开和已关闭的笔记本
 - 可以通过 closed 字段判断笔记本是否已关闭
 - 笔记本ID是创建文档等操作的必要参数`,
@@ -416,19 +462,22 @@ siyuan_create_document({
         type: 'function',
         function: {
             name: 'siyuan_create_notebook',
-            description: `创建新笔记本的工具。
+            description: `# siyuan_create_notebook
 
-**何时使用**：
+创建新笔记本的工具。
+
+## 何时使用
 - 用户要求创建新的笔记本
 - 需要为特定项目或主题创建独立的笔记本
 - 组织和管理笔记结构
 
-**创建功能**：
+## 创建功能
 - 创建指定名称的新笔记本
 - 自动生成笔记本ID
 - 新笔记本会自动打开
 
-**使用示例**：
+## 使用示例
+
 \`\`\`javascript
 // 创建项目笔记本
 siyuan_create_notebook({
@@ -441,7 +490,7 @@ siyuan_create_notebook({
 })
 \`\`\`
 
-**注意事项**：
+## 注意事项
 - 笔记本名称不能为空
 - 如果同名笔记本已存在，可能会报错
 - 创建成功后会返回笔记本对象，包含ID等信息
@@ -464,23 +513,26 @@ siyuan_create_notebook({
         type: 'function',
         function: {
             name: 'siyuan_rename_document',
-            description: `重命名思源笔记文档的工具。
+            description: `# siyuan_rename_document
 
-**何时使用**：
+重命名思源笔记文档的工具。
+
+## 何时使用
 - 用户要求修改文档标题
 - 需要更新文档名称以反映内容变化
 - 整理和优化文档命名
 
-**使用方法**：
+## 使用方法
 1. 通过SQL查询或其他方式获取要重命名的文档ID
 2. 提供新的文档标题
 3. 调用工具完成重命名
 
-**参数说明**：
+## 参数说明
 - id: 文档的块ID
 - title: 新的文档标题
 
-**使用示例**：
+## 使用示例
+
 \`\`\`javascript
 // 重命名文档
 siyuan_rename_document({
@@ -489,7 +541,7 @@ siyuan_rename_document({
 })
 \`\`\`
 
-**注意事项**：
+## 注意事项
 - 必须提供准确的文档ID,如果上下文没有提供ID，需要自己使用sql获取ID
 - 新标题不能为空
 - 重命名不会改变文档ID
@@ -517,25 +569,28 @@ siyuan_rename_document({
         type: 'function',
         function: {
             name: 'siyuan_move_documents',
-            description: `移动思源笔记文档到指定位置的工具。
+            description: `# siyuan_move_documents
 
-**何时使用**：
+移动思源笔记文档到指定位置的工具。
+
+## 何时使用
 - 用户要求移动文档到其他文档下或其他笔记本
 - 需要重新组织文档结构
 - 整理笔记层级关系
 
-**使用方法**：
+## 使用方法
 1. 确定要移动的文档ID列表（可以是一个或多个）
 2. 确定目标位置（目标父文档ID或笔记本ID）
 3. 调用工具完成移动
 
-**参数说明**：
+## 参数说明
 - fromIDs: 源文档ID数组，可以移动多个文档
 - toID: 目标父文档ID或笔记本ID
   - 如果是文档ID，源文档会成为该文档的子文档
   - 如果是笔记本ID，源文档会移动到笔记本根目录
 
-**使用示例**：
+## 使用示例
+
 \`\`\`javascript
 // 移动单个文档到另一个文档下
 siyuan_move_documents({
@@ -550,7 +605,7 @@ siyuan_move_documents({
 })
 \`\`\`
 
-**注意事项**：
+## 注意事项
 - fromIDs 必须是有效的文档ID数组
 - toID 可以是文档ID或笔记本ID，如果上下文没有提供ID，需要自己使用sql获取ID
 - 移动后文档ID不会改变
