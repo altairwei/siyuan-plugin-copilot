@@ -1,5 +1,20 @@
 
 
+## v0.3.0 / 20251107
+
+- ✨ Copilot支持保存聊天会话到文件
+- ✨ 历史对话支持右键菜单 [#23](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/23)
+  - 导出到文件
+  - 钉住/取消钉住：钉住之后置顶，置顶状态需要持久化
+- ✨ feat(ai): 添加在新窗口和标签页打开AI功能
+- ✨ agent模式，拖动文档为上下文只给ai传递块ID
+  - agent模式，拖动文档到上下文只给ai传递文档块ID（拖动块还是获取kramdown给AI）
+
+  - 切换不同模式，之前已经添加到聊天框上方的上下文中的块和文档策略也要即时更新
+    - ask模式：获取Markdown
+     - edit模式：获取kramdown
+     - agent模式：拖动文档到上下文只给ai传递文档块ID（拖动块还是获取kramdown给AI）
+
 ## v0.2.3 / 20251107
 
 - 🎨 sql 查询优化: 更新 SQL 查询文档和移除不必要的安全检查代码
