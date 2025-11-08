@@ -804,7 +804,8 @@
                             multiModelResponses = [...multiModelResponses];
                         },
                     },
-                    providerConfig.customApiUrl
+                    providerConfig.customApiUrl,
+                    providerConfig.advancedConfig
                 );
             } catch (error) {
                 multiModelResponses[index].error = (error as Error).message;
@@ -1847,7 +1848,8 @@
                                 toolExecutionComplete?.();
                             },
                         },
-                        providerConfig.customApiUrl
+                        providerConfig.customApiUrl,
+                        providerConfig.advancedConfig
                     );
 
                     // 等待工具执行完成后再继续循环
@@ -1988,7 +1990,8 @@
                             abortController = null;
                         },
                     },
-                    providerConfig.customApiUrl
+                    providerConfig.customApiUrl,
+                    providerConfig.advancedConfig
                 );
             }
         } catch (error) {
@@ -4671,7 +4674,8 @@
                         abortController = null;
                     },
                 },
-                providerConfig.customApiUrl
+                providerConfig.customApiUrl,
+                providerConfig.advancedConfig
             );
         } catch (error) {
             console.error('Regenerate message error:', error);

@@ -24,6 +24,17 @@
     let isEditingName = false;
     let editingName = providerName;
     let showApiKey = false; // 控制 API Key 是否显示明文
+    let showAdvancedConfig = false; // 控制高级设置是否显示
+
+    // 确保 advancedConfig 存在
+    $: {
+        if (!config.advancedConfig) {
+            config.advancedConfig = {
+                customModelsUrl: '',
+                customChatUrl: ''
+            };
+        }
+    }
 
     // 生成 API 地址预览
     // 规则说明：
@@ -85,7 +96,12 @@
 
         isLoadingModels = true;
         try {
-            const models = await fetchModels(providerId, config.apiKey, config.customApiUrl);
+            const models = await fetchModels(
+                providerId,
+                config.apiKey,
+                config.customApiUrl,
+                config.advancedConfig
+            );
             // 按模型ID升序排序
             availableModels = models
                 .map(m => ({ id: m.id, name: m.name }))
@@ -345,6 +361,54 @@
                     {t('models.manualAdd')}
                 </button>
             </div>
+        </div>
+
+        <!-- 高级自定义设置 -->
+        <div class="advanced-config-section">
+            <button
+                class="b3-button b3-button--text advanced-toggle"
+                on:click={() => (showAdvancedConfig = !showAdvancedConfig)}
+            >
+                <svg class="b3-button__icon" style="transition: transform 0.2s">
+                    <use
+                        xlink:href="#iconDown"
+                        style="transform: rotate({showAdvancedConfig ? 0 : -90}deg)"
+                    ></use>
+                </svg>
+                <span>{t('platform.advanced')}</span>
+            </button>
+
+            {#if showAdvancedConfig}
+                <div class="advanced-config-content">
+                    <div class="b3-label__text advanced-hint">
+                        {t('platform.advancedConfig.hint')}
+                    </div>
+
+                    <div>
+                        <div class="b3-label__text">{t('platform.advancedConfig.modelsUrl')}</div>
+                        <input
+                            class="b3-text-field fn__flex-1"
+                            type="text"
+                            style="width: 100%"
+                            bind:value={config.advancedConfig.customModelsUrl}
+                            on:change={() => dispatch('change')}
+                            placeholder={t('platform.advancedConfig.modelsUrlPlaceholder')}
+                        />
+                    </div>
+
+                    <div>
+                        <div class="b3-label__text">{t('platform.advancedConfig.chatUrl')}</div>
+                        <input
+                            class="b3-text-field fn__flex-1"
+                            type="text"
+                            style="width: 100%"
+                            bind:value={config.advancedConfig.customChatUrl}
+                            on:change={() => dispatch('change')}
+                            placeholder={t('platform.advancedConfig.chatUrlPlaceholder')}
+                        />
+                    </div>
+                </div>
+            {/if}
         </div>
     </div>
 
@@ -953,5 +1017,54 @@
         to {
             transform: rotate(360deg);
         }
+    }
+
+    // 高级设置样式
+    .advanced-config-section {
+        margin-top: 8px;
+        border-top: 1px solid var(--b3-border-color);
+        padding-top: 8px;
+    }
+
+    .advanced-toggle {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 0;
+        width: 100%;
+        justify-content: flex-start;
+        color: var(--b3-theme-on-surface);
+        font-size: 13px;
+
+        &:hover {
+            color: var(--b3-theme-on-background);
+        }
+
+        .b3-button__icon {
+            width: 14px;
+            height: 14px;
+        }
+    }
+
+    .advanced-config-content {
+        margin-top: 12px;
+        padding: 12px;
+        background: var(--b3-theme-background);
+        border-radius: 6px;
+        border: 1px solid var(--b3-border-color);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .advanced-hint {
+        font-size: 11px;
+        color: var(--b3-theme-on-surface-light);
+        line-height: 1.4;
+        margin-bottom: 4px;
+        padding: 8px;
+        background: var(--b3-theme-surface);
+        border-radius: 4px;
+        border-left: 3px solid var(--b3-theme-primary);
     }
 </style>

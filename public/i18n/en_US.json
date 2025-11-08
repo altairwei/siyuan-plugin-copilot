@@ -367,7 +367,17 @@
         "apiUrlHint": "Ending with / ignores v1 version, ending with # forces the input address",
         "apiUrlPlaceholder": "Enter custom API URL",
         "builtin": "Built-in",
-        "custom": "Custom"
+        "custom": "Custom",
+        "advanced": "Advanced Settings",
+        "advancedConfig": {
+            "title": "Advanced Custom URLs",
+            "description": "Customize complete URLs for model list and chat endpoints for special requirements",
+            "modelsUrl": "Models List URL",
+            "modelsUrlPlaceholder": "Leave empty to use default, e.g.: https://api.example.com/v1/models",
+            "chatUrl": "Chat Endpoint URL",
+            "chatUrlPlaceholder": "Leave empty to use default, e.g.: https://api.example.com/v1/chat/completions",
+            "hint": "Advanced settings allow complete customization of API endpoints, suitable for special API proxies or non-standard implementations"
+        }
     },
     "common": {
         "untitled": "Untitled Document",

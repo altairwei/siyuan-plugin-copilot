@@ -216,14 +216,18 @@ function getBaseUrlAndEndpoint(
 export async function fetchModels(
     provider: string,
     apiKey: string,
-    customApiUrl?: string
+    customApiUrl?: string,
+    advancedConfig?: { customModelsUrl?: string; customChatUrl?: string }
 ): Promise<ModelInfo[]> {
     const isBuiltIn = ['gemini', 'deepseek', 'openai', 'moonshot', 'volcano', 'v3'].includes(provider);
     const config = isBuiltIn ? PROVIDER_CONFIGS[provider as AIProvider] : PROVIDER_CONFIGS.custom;
 
     let url: string;
 
-    if (customApiUrl) {
+    // 优先使用高级自定义的模型列表 URL
+    if (advancedConfig?.customModelsUrl) {
+        url = advancedConfig.customModelsUrl;
+    } else if (customApiUrl) {
         const { baseUrl, endpoint } = getBaseUrlAndEndpoint(customApiUrl, config.modelsEndpoint);
         url = `${baseUrl}${endpoint}`;
     } else {
@@ -737,7 +741,8 @@ async function handleGeminiStreamResponse(
 export async function chat(
     provider: string,
     options: ChatOptions,
-    customApiUrl?: string
+    customApiUrl?: string,
+    advancedConfig?: { customModelsUrl?: string; customChatUrl?: string }
 ): Promise<void> {
     const isBuiltIn = ['gemini', 'deepseek', 'openai', 'moonshot', 'volcano', 'v3'].includes(provider);
     const config = isBuiltIn ? PROVIDER_CONFIGS[provider as AIProvider] : PROVIDER_CONFIGS.custom;
@@ -745,7 +750,11 @@ export async function chat(
     let url: string;
     let baseUrlForGemini: string; // Gemini format needs a base url
 
-    if (customApiUrl) {
+    // 优先使用高级自定义的对话 URL
+    if (advancedConfig?.customChatUrl) {
+        url = advancedConfig.customChatUrl;
+        baseUrlForGemini = advancedConfig.customChatUrl.replace(/\/v1.*$/, ''); // 尝试提取基础URL
+    } else if (customApiUrl) {
         const { baseUrl, endpoint } = getBaseUrlAndEndpoint(customApiUrl, config.chatEndpoint);
         url = `${baseUrl}${endpoint}`;
         baseUrlForGemini = baseUrl;

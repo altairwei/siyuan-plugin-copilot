@@ -366,7 +366,17 @@
         "apiUrlHint": "以 / 结尾忽略 v1 版本，以 # 结尾强制使用输入地址",
         "apiUrlPlaceholder": "输入自定义 API 地址",
         "builtin": "内置",
-        "custom": "自定义"
+        "custom": "自定义",
+        "advanced": "高级设置",
+        "advancedConfig": {
+            "title": "高级自定义 URL",
+            "description": "为特殊需求自定义模型列表和对话接口的完整 URL",
+            "modelsUrl": "模型列表 URL",
+            "modelsUrlPlaceholder": "留空使用默认接口，例如: https://api.example.com/v1/models",
+            "chatUrl": "对话接口 URL",
+            "chatUrlPlaceholder": "留空使用默认接口，例如: https://api.example.com/v1/chat/completions",
+            "hint": "高级设置允许完全自定义 API 端点，适用于特殊的 API 代理或非标准实现"
+        }
     },
     "common": {
         "untitled": "未命名文档",

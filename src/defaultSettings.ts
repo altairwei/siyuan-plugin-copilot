@@ -15,6 +15,10 @@ export interface ProviderConfig {
     apiKey: string;
     customApiUrl: string;
     models: ModelConfig[];
+    advancedConfig?: {
+        customModelsUrl?: string; // 自定义模型列表 URL
+        customChatUrl?: string;   // 自定义对话 URL
+    };
 }
 
 export interface CustomProviderConfig extends ProviderConfig {
