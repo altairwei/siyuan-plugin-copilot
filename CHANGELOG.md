@@ -1,4 +1,13 @@
 
+## v0.3.1 / 20251108
+
+- ♻️ 修复无法跨块多选内容复制 [#34](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/34)
+- 🎨 编辑提示词不要显示「已保存提示词」 [#31](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/31)
+- 💄 添加提示词的按钮icon优化 [#32](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/32)
+- 🔥 聊天窗口去除左上角的名称 [#30](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/30)
+- ✨ 选择多模型`需要显示已选用的模型名称 [#29](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/29)
+- 🐛 工具列表错误添加一级标题 [#27](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/27)
+
 
 ## v0.3.0 / 20251107
 
