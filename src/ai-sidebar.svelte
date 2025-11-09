@@ -3313,6 +3313,9 @@
 
         const now = Date.now();
 
+        // 【修复】在保存前重新加载最新的会话列表，避免多页签覆盖问题
+        await loadSessions();
+
         if (currentSessionId) {
             // 更新现有会话
             const session = sessions.find(s => s.id === currentSessionId);
@@ -3320,6 +3323,16 @@
                 session.messages = [...messages];
                 session.title = generateSessionTitle();
                 session.updatedAt = now;
+            } else {
+                // 如果会话不存在（可能被其他实例删除），创建为新会话
+                const newSession: ChatSession = {
+                    id: currentSessionId,
+                    title: generateSessionTitle(),
+                    messages: [...messages],
+                    createdAt: now,
+                    updatedAt: now,
+                };
+                sessions = [newSession, ...sessions];
             }
         } else {
             // 创建新会话
@@ -3472,6 +3485,8 @@
             t('aiSidebar.confirm.deleteSession.title'),
             t('aiSidebar.confirm.deleteSession.message'),
             async () => {
+                // 【修复】删除前重新加载最新的会话列表，避免多页签覆盖问题
+                await loadSessions();
                 sessions = sessions.filter(s => s.id !== sessionId);
                 await saveSessions();
 
@@ -3484,7 +3499,21 @@
 
     // 处理会话更新（如钉住状态变化）
     async function handleSessionUpdate(updatedSessions: ChatSession[]) {
-        sessions = updatedSessions;
+        // 【修复】更新前重新加载最新的会话列表，避免多页签覆盖问题
+        await loadSessions();
+
+        // 找到被更新的会话，只更新这些会话的数据
+        for (const updatedSession of updatedSessions) {
+            const index = sessions.findIndex(s => s.id === updatedSession.id);
+            if (index >= 0) {
+                // 只更新会话的属性，保留其他实例可能修改的 messages
+                sessions[index] = {
+                    ...sessions[index],
+                    ...updatedSession,
+                };
+            }
+        }
+
         await saveSessions();
     }
 
@@ -4913,6 +4942,7 @@
                 bind:sessions
                 bind:currentSessionId
                 bind:isOpen={isSessionManagerOpen}
+                on:refresh={loadSessions}
                 on:load={e => loadSession(e.detail.sessionId)}
                 on:delete={e => deleteSession(e.detail.sessionId)}
                 on:new={newSession}
