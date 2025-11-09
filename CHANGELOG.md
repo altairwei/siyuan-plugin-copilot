@@ -1,4 +1,28 @@
 
+## v0.4.0 / 20251108
+
+- ✨ 聊天框下方添加一个模型设置按钮
+
+  - 使用iconEdit图标、
+  - 每个设置有checkbox进行开关
+  - 支持设置上下文数
+  - 支持临时修改模型Temperature
+  - 支持临时修改系统提示词
+  - 支持保存预设和加载某个预设
+- ✨ feat(会话管理): 添加批量删除会话功能
+
+  - 实现多选模式，允许用户选择多个会话
+  - 添加全选/取消全选功能
+  - 提供批量删除选中会话的操作
+  - 更新会话列表以避免多页签覆盖问题
+- 🎨 优化多页签问答的聊天历史记录保存问题 [#28](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/28)
+- 🎨 多模型问答优化 [#37](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/37)
+
+  - 多模型回答的复制按钮优化：复制当前页签查看的模型回答
+  - 重新生成优化：如果选了多模型回答，重新生成还是要用多模型回答
+- 🎨 鼠标划选弹窗需要转Markdown [#36](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/36)
+- 💄 消息内容从.protyle改为b3-typography类 [#38](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/38)
+
 ## v0.3.2 / 20251108  
 
 - 🎨模型搜索优化
