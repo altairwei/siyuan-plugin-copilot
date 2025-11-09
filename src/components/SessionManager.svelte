@@ -30,6 +30,10 @@
     let contextMenuY = 0;
     let contextMenuSession: ChatSession | null = null;
 
+    // 批量删除相关状态
+    let isMultiSelectMode = false; // 是否处于多选模式
+    let selectedSessionIds: Set<string> = new Set(); // 选中的会话ID集合
+
     function formatDate(timestamp: number): string {
         const date = new Date(timestamp);
         const now = new Date();
@@ -56,6 +60,12 @@
     }
 
     function loadSession(sessionId: string) {
+        // 多选模式下不加载会话，只切换选中状态
+        if (isMultiSelectMode) {
+            toggleSessionSelection(sessionId);
+            return;
+        }
+        
         dispatch('load', { sessionId });
         isOpen = false;
     }
@@ -69,6 +79,56 @@
         dispatch('new');
         isOpen = false;
     }
+
+    // 切换多选模式
+    function toggleMultiSelectMode() {
+        isMultiSelectMode = !isMultiSelectMode;
+        if (!isMultiSelectMode) {
+            // 退出多选模式时清空选中项
+            selectedSessionIds.clear();
+            selectedSessionIds = selectedSessionIds;
+        }
+    }
+
+    // 切换会话选中状态
+    function toggleSessionSelection(sessionId: string) {
+        if (selectedSessionIds.has(sessionId)) {
+            selectedSessionIds.delete(sessionId);
+        } else {
+            selectedSessionIds.add(sessionId);
+        }
+        selectedSessionIds = selectedSessionIds; // 触发响应式更新
+    }
+
+    // 全选/取消全选
+    function toggleSelectAll() {
+        if (selectedSessionIds.size === sortedSessions.length) {
+            // 当前全选，则取消全选
+            selectedSessionIds.clear();
+        } else {
+            // 未全选，则全选
+            selectedSessionIds = new Set(sortedSessions.map(s => s.id));
+        }
+        selectedSessionIds = selectedSessionIds; // 触发响应式更新
+    }
+
+    // 批量删除选中的会话
+    function batchDeleteSessions() {
+        if (selectedSessionIds.size === 0) {
+            pushMsg('请先选择要删除的会话');
+            return;
+        }
+
+        dispatch('batchDelete', { sessionIds: Array.from(selectedSessionIds) });
+        
+        // 删除后退出多选模式
+        isMultiSelectMode = false;
+        selectedSessionIds.clear();
+        selectedSessionIds = selectedSessionIds;
+    }
+
+    // 是否全选
+    $: isAllSelected = sortedSessions.length > 0 && selectedSessionIds.size === sortedSessions.length;
 
     function closeOnOutsideClick(event: MouseEvent) {
         const target = event.target as HTMLElement;
@@ -114,6 +174,8 @@
     }
 
     $: if (isOpen) {
+        // 打开时触发刷新事件，重新加载最新的会话列表
+        dispatch('refresh');
         updateDropdownPosition();
         setTimeout(() => {
             document.addEventListener('click', closeOnOutsideClick);
@@ -248,10 +310,55 @@
         >
             <div class="session-manager__header">
                 <h4>{t('aiSidebar.session.history')}</h4>
-                <button class="b3-button b3-button--primary" on:click={newSession}>
-                    <svg class="b3-button__icon"><use xlink:href="#iconAdd"></use></svg>
-                    {t('aiSidebar.session.new')}
-                </button>
+                <div class="session-manager__header-actions">
+                    {#if isMultiSelectMode}
+                        <!-- 多选模式下的操作按钮 -->
+                        <button
+                            class="b3-button b3-button--text"
+                            on:click={toggleSelectAll}
+                            title={isAllSelected ? '取消全选' : '全选'}
+                        >
+                            <svg class="b3-button__icon">
+                                <use xlink:href={isAllSelected ? '#iconCloseRound' : '#iconSelect'}></use>
+                            </svg>
+                        </button>
+                        <button
+                            class="b3-button b3-button--error"
+                            on:click={batchDeleteSessions}
+                            disabled={selectedSessionIds.size === 0}
+                            title="删除选中 ({selectedSessionIds.size})"
+                        >
+                            <svg class="b3-button__icon">
+                                <use xlink:href="#iconTrashcan"></use>
+                            </svg>
+                            <span>删除 ({selectedSessionIds.size})</span>
+                        </button>
+                        <button
+                            class="b3-button b3-button--text"
+                            on:click={toggleMultiSelectMode}
+                            title="退出多选"
+                        >
+                            <svg class="b3-button__icon">
+                                <use xlink:href="#iconClose"></use>
+                            </svg>
+                        </button>
+                    {:else}
+                        <!-- 普通模式下的操作按钮 -->
+                        <button
+                            class="b3-button b3-button--text"
+                            on:click|stopPropagation={toggleMultiSelectMode}
+                            title="多选删除"
+                        >
+                            <svg class="b3-button__icon">
+                                <use xlink:href="#iconList"></use>
+                            </svg>
+                        </button>
+                        <button class="b3-button b3-button--primary" on:click={newSession}>
+                            <svg class="b3-button__icon"><use xlink:href="#iconAdd"></use></svg>
+                            {t('aiSidebar.session.new')}
+                        </button>
+                    {/if}
+                </div>
             </div>
 
             <div class="session-manager__list">
@@ -263,12 +370,24 @@
                             class="session-item"
                             class:session-item--active={session.id === currentSessionId}
                             class:session-item--pinned={session.pinned}
+                            class:session-item--selected={selectedSessionIds.has(session.id)}
                             role="button"
                             tabindex="0"
                             on:click={() => loadSession(session.id)}
                             on:contextmenu={e => showContextMenu(e, session)}
                             on:keydown={() => {}}
                         >
+                            {#if isMultiSelectMode}
+                                <!-- 多选模式下显示复选框 -->
+                                <div class="session-item__checkbox">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedSessionIds.has(session.id)}
+                                        on:change={() => toggleSessionSelection(session.id)}
+                                        on:click|stopPropagation
+                                    />
+                                </div>
+                            {/if}
                             <div class="session-item__content">
                                 <div class="session-item__title">
                                     {#if session.pinned}
@@ -288,15 +407,18 @@
                                     </span>
                                 </div>
                             </div>
-                            <button
-                                class="b3-button b3-button--text session-item__delete"
-                                on:click={e => deleteSession(session.id, e)}
-                                title={t('aiSidebar.session.delete')}
-                            >
-                                <svg class="b3-button__icon">
-                                    <use xlink:href="#iconTrashcan"></use>
-                                </svg>
-                            </button>
+                            {#if !isMultiSelectMode}
+                                <!-- 普通模式下显示删除按钮 -->
+                                <button
+                                    class="b3-button b3-button--text session-item__delete"
+                                    on:click={e => deleteSession(session.id, e)}
+                                    title={t('aiSidebar.session.delete')}
+                                >
+                                    <svg class="b3-button__icon">
+                                        <use xlink:href="#iconTrashcan"></use>
+                                    </svg>
+                                </button>
+                            {/if}
                         </div>
                     {/each}
                 {/if}
@@ -375,9 +497,20 @@
             color: var(--b3-theme-on-background);
         }
 
+        .session-manager__header-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
         button {
             font-size: 12px;
             padding: 4px 12px;
+            
+            &:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
         }
     }
 
@@ -422,6 +555,25 @@
         .session-item__title {
             color: var(--b3-theme-primary);
             font-weight: 600;
+        }
+    }
+
+    .session-item--selected {
+        background: var(--b3-theme-primary-lightest);
+        border-color: var(--b3-theme-primary);
+    }
+
+    .session-item__checkbox {
+        display: flex;
+        align-items: center;
+        margin: 0;
+        cursor: pointer;
+
+        input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            margin: 0;
         }
     }
 

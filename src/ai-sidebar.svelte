@@ -3497,6 +3497,34 @@
         );
     }
 
+    // 批量删除会话
+    async function batchDeleteSessions(sessionIds: string[]) {
+        if (!sessionIds || sessionIds.length === 0) {
+            return;
+        }
+
+        const count = sessionIds.length;
+        confirm(
+            '批量删除会话',
+            `确定要删除选中的 ${count} 个会话吗？此操作不可恢复。`,
+            async () => {
+                // 【修复】删除前重新加载最新的会话列表，避免多页签覆盖问题
+                await loadSessions();
+                
+                // 过滤掉要删除的会话
+                sessions = sessions.filter(s => !sessionIds.includes(s.id));
+                await saveSessions();
+
+                // 如果当前会话被删除，创建新会话
+                if (sessionIds.includes(currentSessionId)) {
+                    doNewSession();
+                }
+
+                pushMsg(`成功删除 ${count} 个会话`);
+            }
+        );
+    }
+
     // 处理会话更新（如钉住状态变化）
     async function handleSessionUpdate(updatedSessions: ChatSession[]) {
         // 【修复】更新前重新加载最新的会话列表，避免多页签覆盖问题
@@ -4945,6 +4973,7 @@
                 on:refresh={loadSessions}
                 on:load={e => loadSession(e.detail.sessionId)}
                 on:delete={e => deleteSession(e.detail.sessionId)}
+                on:batchDelete={e => batchDeleteSessions(e.detail.sessionIds)}
                 on:new={newSession}
                 on:update={e => handleSessionUpdate(e.detail.sessions)}
             />
