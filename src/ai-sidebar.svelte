@@ -796,6 +796,7 @@
         isWaitingForAnswerSelection = true;
         hasUnsavedChanges = true;
         autoScroll = true;
+        isAborted = false; // 重置中断标志
 
         await scrollToBottom(true);
 
@@ -821,6 +822,9 @@
             };
         });
 
+        // 创建新的 AbortController
+        abortController = new AbortController();
+
         // 并发请求所有模型
         const promises = selectedMultiModels.map(async (model, index) => {
             const config = getProviderAndModelConfig(model.provider, model.modelId);
@@ -842,6 +846,7 @@
                         temperature: tempModelSettings.temperature,
                         maxTokens: modelConfig.maxTokens > 0 ? modelConfig.maxTokens : undefined,
                         stream: true,
+                        signal: abortController.signal,
                         enableThinking: modelConfig.capabilities?.thinking || false,
                         onThinkingChunk: async (chunk: string) => {
                             thinking += chunk;
@@ -860,6 +865,10 @@
                             multiModelResponses = [...multiModelResponses];
                         },
                         onComplete: async (text: string) => {
+                            // 如果已经中断，不再处理完成回调
+                            if (isAborted) {
+                                return;
+                            }
                             multiModelResponses[index].content = convertLatexToMarkdown(text);
                             multiModelResponses[index].thinking = thinking;
                             multiModelResponses[index].isLoading = false;
@@ -869,24 +878,31 @@
                             multiModelResponses = [...multiModelResponses];
                         },
                         onError: (error: Error) => {
-                            multiModelResponses[index].error = error.message;
-                            multiModelResponses[index].isLoading = false;
-                            multiModelResponses = [...multiModelResponses];
+                            // 如果是主动中断，不显示错误
+                            if (error.message !== 'Request aborted') {
+                                multiModelResponses[index].error = error.message;
+                                multiModelResponses[index].isLoading = false;
+                                multiModelResponses = [...multiModelResponses];
+                            }
                         },
                     },
                     providerConfig.customApiUrl,
                     providerConfig.advancedConfig
                 );
             } catch (error) {
-                multiModelResponses[index].error = (error as Error).message;
-                multiModelResponses[index].isLoading = false;
-                multiModelResponses = [...multiModelResponses];
+                // 如果是主动中断，不显示错误
+                if ((error as Error).message !== 'Request aborted') {
+                    multiModelResponses[index].error = (error as Error).message;
+                    multiModelResponses[index].isLoading = false;
+                    multiModelResponses = [...multiModelResponses];
+                }
             }
         });
 
         // 等待所有请求完成
         await Promise.all(promises);
         isLoading = false;
+        abortController = null;
     }
 
     // 准备发送给AI的消息（提取为独立函数以便复用）
@@ -2121,7 +2137,42 @@
             abortController.abort();
             isAborted = true; // 设置中断标志，防止 onComplete 再次添加消息
 
-            // 如果有已生成的部分，将其保存为消息
+            // 如果是多模型模式且正在等待选择答案
+            if (isWaitingForAnswerSelection && multiModelResponses.length > 0) {
+                // 找到第一个成功的响应作为默认选择
+                const firstSuccessIndex = multiModelResponses.findIndex(r => !r.error && !r.isLoading);
+
+                if (firstSuccessIndex !== -1) {
+                    const selectedResponse = multiModelResponses[firstSuccessIndex];
+                    const assistantMessage: Message = {
+                        role: 'assistant',
+                        content: selectedResponse.content || '',
+                        thinking: selectedResponse.thinking,
+                        multiModelResponses: multiModelResponses.map((response, i) => ({
+                            ...response,
+                            isSelected: i === firstSuccessIndex,
+                            modelName:
+                                i === firstSuccessIndex
+                                    ? ' ✅' + response.modelName
+                                    : response.modelName, // 选择的模型名添加✅
+                        })),
+                    };
+
+                    messages = [...messages, assistantMessage];
+                    hasUnsavedChanges = true;
+                }
+
+                // 清除多模型状态
+                multiModelResponses = [];
+                isWaitingForAnswerSelection = false;
+                selectedAnswerIndex = null;
+                selectedTabIndex = 0;
+                isLoading = false;
+                abortController = null;
+                return;
+            }
+
+            // 单模型模式：如果有已生成的部分，将其保存为消息
             if (streamingMessage || streamingThinking) {
                 // 先保存到临时变量
                 const tempStreamingMessage = streamingMessage;
