@@ -1,3 +1,7 @@
+## v0.4.2 / 20251110
+- 🎨 点击查看历史对话的内容，要跳到最开头，目前默认是最末尾 [#42](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/42)
+- 🎨 上下文消息添加复制按钮 [#41](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/41)
+
 ## v0.4.1 / 20251109
 
 - 🎨 思考过程默认折叠 [[[#40](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/40)](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/40)](https://github.com/Achuan-2/siyuan-plugin-copilot/issues/40)
