@@ -2737,11 +2737,11 @@
                     toolbar.className = 'code-block-toolbar';
 
                     // 只有当有语言时才创建语言标签
-                        // 创建语言标签
-                        const langLabel = document.createElement('div');
-                        langLabel.className = 'code-block-lang-label';
-                        langLabel.textContent = language;
-                        toolbar.appendChild(langLabel);
+                    // 创建语言标签
+                    const langLabel = document.createElement('div');
+                    langLabel.className = 'code-block-lang-label';
+                    langLabel.textContent = language;
+                    toolbar.appendChild(langLabel);
 
                     // 创建复制按钮
                     const copyButton = document.createElement('button');
