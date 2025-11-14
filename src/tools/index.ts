@@ -5,7 +5,6 @@
 
 import {
     sql,
-    insertBlock,
     updateBlock,
     getBlockKramdown,
     exportMdContent,
@@ -18,6 +17,7 @@ import {
     createNotebook,
     renameDocByID,
     moveDocsByID,
+    appendBlock,
 } from '../api';
 import { getActiveEditor } from 'siyuan';
 
@@ -244,18 +244,47 @@ SELECT * FROM blocks WHERE tag LIKE '%标签名%';
 3. 调用工具插入内容
 
 ## 位置参数说明
-- parentID: 将新块作为指定块的子块插入
+- parentID: 将新块作为指定块的子块插入（前置子块）
+- appendParentID: 将新块作为指定块的后置子块插入（追加到父块最后）
 - previousID: 在指定块之后插入新块
 - nextID: 在指定块之前插入新块
 
-## 内容格式
-- 支持完整的Markdown语法
-- 支持思源笔记的扩展语法（如块引用、嵌入块等）
-- 会自动生成块ID
+## 使用示例
+
+\`\`\`javascript
+// 在块前插入新块
+siyuan_insert_block({
+  dataType: "markdown",
+  data: "# 新标题\\n\\n这是新插入的内容。",
+  nextID: "20210104091228-d0rzbmm"  // 在此块之前插入
+})
+
+// 在块后插入新块
+siyuan_insert_block({
+  dataType: "markdown",
+  data: "- 新列表项",
+  previousID: "20210104091228-d0rzbmm"  // 在此块之后插入
+})
+
+// 作为前置子块插入
+siyuan_insert_block({
+  dataType: "markdown",
+  data: "这是前置子块内容",
+  parentID: "20210104091228-d0rzbmm"  // 作为此块的前置子块
+})
+
+// 作为后置子块插入（追加到父块最后）
+siyuan_insert_block({
+  dataType: "markdown",
+  data: "这是后置子块内容",
+  appendParentID: "20210104091228-d0rzbmm"  // 作为此块的后置子块
+})
+\`\`\`
 
 ## 注意事项
-- 至少需要指定一个位置参数（parentID、previousID或nextID）
-- 如果指定parentID，会作为子块追加到末尾
+- 至少需要指定一个位置参数（parentID、appendParentID、previousID或nextID）
+- 如果指定parentID，会作为子块追加到父块的最前面
+- 如果指定appendParentID，会作为子块追加到父块的最后面
 - previousID和nextID用于在同级块中定位
 - 插入大量内容时考虑分批插入`,
             parameters: {
@@ -272,7 +301,11 @@ SELECT * FROM blocks WHERE tag LIKE '%标签名%';
                     },
                     parentID: {
                         type: 'string',
-                        description: '父块ID，将新块作为子块插入（可选）',
+                        description: '父块ID，将新块作为前置子块插入（可选）',
+                    },
+                    appendParentID: {
+                        type: 'string',
+                        description: '父块ID，将新块作为后置子块追加到父块最后（可选）',
                     },
                     previousID: {
                         type: 'string',
@@ -648,21 +681,24 @@ export async function siyuan_insert_block(
     dataType: 'markdown' | 'dom',
     data: string,
     parentID?: string,
+    appendParentID?: string,
     previousID?: string,
     nextID?: string
 ): Promise<any> {
     try {
-        if (!parentID && !previousID && !nextID) {
-            throw new Error('必须至少指定一个位置参数：parentID、previousID 或 nextID');
+        if (!parentID && !appendParentID && !previousID && !nextID) {
+            throw new Error('必须至少指定一个位置参数：parentID、appendParentID、previousID 或 nextID');
         }
 
         // 使用 insertBlock API 插入块
-        // const insertRes
-        // ult = await insertBlock(dataType, data, nextID, previousID, parentID);
-        // await refreshSql();
         let lute = window.Lute.New()
-        let newBlockDom = lute.Md2BlockDOM(data);
-        let newBlockId = newBlockDom.match(/data-node-id="([^"]*)"/)[1];
+        let newBlockDom: string;
+        if (dataType === 'dom') {
+            newBlockDom = data;
+        } else {
+            newBlockDom = lute.Md2BlockDOM(data);
+        }
+        let newBlockId = newBlockDom.match(/data-node-id="([^"]*)"/)?.[1];
 
         let insertResult = null;
         // 创建可撤回的事务
@@ -672,7 +708,7 @@ export async function siyuan_insert_block(
                 if (currentProtyle) {
 
                     // 获取父块ID
-                    let actualParentID = parentID;
+                    let actualParentID = parentID || appendParentID;
                     if (!actualParentID && (previousID || nextID)) {
                         const refBlockId = previousID || nextID;
                         const refBlock = await getBlockByID(refBlockId as string);
@@ -680,7 +716,18 @@ export async function siyuan_insert_block(
                     }
 
                     const doOperations = [];
-                    if (nextID) {
+                    if (appendParentID) {
+                        // 使用appendBlock API作为后置子块插入
+                        const appendResult = await appendBlock(dataType, data, appendParentID);
+                        insertResult = {
+                            id: newBlockId,
+                            parentID: appendParentID,
+                            previousID: previousID,
+                            nextID: nextID,
+                            appendParentID: appendParentID
+                        };
+                        return insertResult;
+                    } else if (nextID) {
                         doOperations.push({
                             action: 'insert',
                             id: newBlockId,
@@ -696,7 +743,7 @@ export async function siyuan_insert_block(
                             parentID: actualParentID,
                             previousID: previousID,
                         });
-                    } else {
+                    } else if (parentID) {
                         doOperations.push({
                             action: 'insert',
                             id: newBlockId,
@@ -712,7 +759,13 @@ export async function siyuan_insert_block(
                             data: null,
                         },
                     ];
-                    insertResult = { id: newBlockId, parentID: actualParentID, previousID: previousID, nextID: nextID };
+                    insertResult = {
+                        id: newBlockId,
+                        parentID: actualParentID,
+                        previousID: previousID,
+                        nextID: nextID,
+                        appendParentID: appendParentID
+                    };
                     // 执行事务以支持撤回
                     // @ts-ignore
                     currentProtyle.getInstance()?.transaction(doOperations, undoOperations);
@@ -912,6 +965,7 @@ export async function executeToolCall(toolCall: ToolCall): Promise<string> {
                     args.dataType,
                     args.data,
                     args.parentID,
+                    args.appendParentID,
                     args.previousID,
                     args.nextID
                 );
