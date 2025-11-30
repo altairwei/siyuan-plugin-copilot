@@ -3801,8 +3801,10 @@
             const payload = JSON.parse(data);
             const rootId = payload?.children?.rootId;
             if (rootId) {
-                // 拖放页签时，如果有聚焦块，则使用聚焦块内容
-                await addItemByBlockId(rootId, true);
+                // 拖放页签时：使用拖拽的文档ID，不应覆盖为当前聚焦的块ID
+                // 之前传入了 true 来使用聚焦块，这会导致插件错误地使用当前已打开的文档
+                // 而不是拖动的文档。改为 false 以使用拖动的文档 ID。
+                await addItemByBlockId(rootId, false);
             }
             const tab = document.querySelector(
                 `li[data-type="tab-header"][data-id="${payload.id}"]`
