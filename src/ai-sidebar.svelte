@@ -2838,7 +2838,7 @@
                         }
                         let highlighted;
                         // 如果指定了语言且可识别，使用 hljs.highlight
-                        console.log(language)
+                        console.log(language);
                         if (language) {
                             const code = block.textContent || '';
                             hljs.highlight(code, {
@@ -3223,8 +3223,6 @@
             }
         });
     }
-
-
 
     // 复制单条消息
     function copyMessage(content: string | MessageContent[]) {
@@ -7898,7 +7896,7 @@
 
         .ai-message__content {
             background: var(--b3-theme-background);
-            color: var(--b3-theme-on-surface);
+            color: var(--b3-theme-on-background);
             max-width: 90%;
         }
 
@@ -10295,4 +10293,5 @@
             height: 20px !important;
         }
     }
+
 </style>
