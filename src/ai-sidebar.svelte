@@ -7897,7 +7897,7 @@
         }
 
         .ai-message__content {
-            background: var(--b3-theme-surface);
+            background: var(--b3-theme-background);
             color: var(--b3-theme-on-surface);
             max-width: 90%;
         }
@@ -9547,7 +9547,6 @@
     .ai-sidebar__multi-model-card-content {
         flex: 1;
         overflow-y: auto;
-        max-height: 400px;
         padding: 4px;
         user-select: text; // 允许文本选择
 
@@ -9723,7 +9722,6 @@
     .ai-sidebar__multi-model-tab-panel-content {
         flex: 1;
         overflow-y: auto;
-        max-height: 500px;
         padding: 4px;
         user-select: text; // 允许文本选择
 
@@ -9988,7 +9986,6 @@
     .ai-message__multi-model-card-content {
         flex: 1;
         overflow-y: auto;
-        max-height: 300px;
         padding: 4px;
 
         &::-webkit-scrollbar {
@@ -10245,7 +10242,7 @@
         right: 0 !important;
         bottom: 0 !important;
         width: 100vw !important;
-        z-index: 9999 !important;
+        z-index: 10 !important;
         background: var(--b3-theme-background) !important;
         border: none !important;
         border-radius: 0 !important;
