@@ -4212,6 +4212,10 @@
     }
 
     // 搜索保存路径
+    // 说明：默认使用 searchDocs() 进行服务器端全文搜索（匹配标题等），
+    // 但在某些情况下（例如输入像 `2025` 的年份/目录片段）searchDocs 可能不会匹配到 hPath。
+    // 因此我们在 searchDocs 没有返回结果时，针对仅包含数字或路径片段的关键字，
+    // 退回到使用 SQL 查询 blocks.hpath 字段做模糊匹配，合并到搜索结果中以提升匹配率。
     async function searchSavePath() {
         if (!savePathSearchKeyword.trim()) {
             savePathSearchResults = [];
@@ -4221,11 +4225,46 @@
         isSavePathSearching = true;
         try {
             const results = await searchDocs(savePathSearchKeyword);
+
             // 过滤：只显示选中笔记本中的文档
             if (results && saveNotebookId) {
-                savePathSearchResults = results.filter(doc => doc.box === saveNotebookId);
+                savePathSearchResults = (results.filter(doc => doc.box === saveNotebookId) || []).map((doc: any) => ({
+                    ...doc,
+                    // 将 hPath 规范化为相对于所选笔记本的路径（如果 hPath 包含笔记本名则去掉它）
+                    hPath: toRelativePath(doc.hPath || ''),
+                }));
             } else {
-                savePathSearchResults = results || [];
+                savePathSearchResults = (results || []).map((doc: any) => ({
+                    ...doc,
+                    hPath: toRelativePath(doc.hPath || ''),
+                }));
+            }
+
+            // 如果 searchDocs 没有返回结果，针对数值或仅路径片段的情况，退回到使用 SQL 的 hpath 模糊匹配
+            // 例如：当用户输入 "2025"（年份）时，hPath 里通常会是 /.../2025/...，searchDocs 可能不会匹配到
+            // 我们在这里尝试 SQL 查询 blocks.hpath 字段进行模糊匹配以丰富搜索结果
+            const isLikelyPathFragment = /^[0-9\-\/]+$/.test(savePathSearchKeyword.trim());
+
+            if ((savePathSearchResults.length === 0 || (savePathSearchResults && savePathSearchResults.length === 0)) && isLikelyPathFragment) {
+                try {
+                    const kw = savePathSearchKeyword.trim().replace(/'/g, "''");
+                    const boxFilter = saveNotebookId ? ` AND box = '${String(saveNotebookId).replace(/'/g, "''")}'` : '';
+                    const sqlQuery = `SELECT id, path, hpath, box FROM blocks WHERE type='d' AND hpath LIKE '%${kw}%' ${boxFilter} ORDER BY updated DESC LIMIT 200`;
+                    const sqlResults = await sql(sqlQuery);
+                    if (sqlResults && sqlResults.length > 0) {
+                        // 将 SQL 的结果映射为 searchDocs 的返回格式（hPath 和 path）
+                        const mapped = sqlResults.map((r: any) => ({ hPath: toRelativePath(r.hpath || r.hPath || ''), path: r.path, box: r.box }));
+                        // 合并并去重
+                        const existingHPaths = new Set(savePathSearchResults.map((d: any) => String(d.hPath)));
+                        for (const doc of mapped) {
+                            if (!existingHPaths.has(String(doc.hPath))) {
+                                savePathSearchResults.push(doc);
+                            }
+                        }
+                    }
+                } catch (sqlError) {
+                    console.error('Fallback SQL search save path error:', sqlError);
+                }
             }
         } catch (error) {
             console.error('Search save path error:', error);
@@ -7304,7 +7343,7 @@
                                             class="save-to-note-dialog__path-item"
                                             on:click={() => selectSavePath(doc.hPath)}
                                             on:keydown={e => {
-                                                if (e.key === 'Enter') selectSavePath( doc.hPath);
+                                                if (e.key === 'Enter') selectSavePath(doc.hPath);
                                             }}
                                             role="button"
                                             tabindex="0"
