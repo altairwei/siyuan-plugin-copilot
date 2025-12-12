@@ -82,6 +82,10 @@
     let contextMenuY = 0;
     let contextMenuMessageIndex: number | null = null;
     let contextMenuMessageType: 'user' | 'assistant' | null = null;
+    // 选区相关（用于右键时判断是否对选中的文本进行复制）
+    let selectionInMessage = false;
+    let selectionHtml = '';
+    let selectionText = '';
 
     // 附件管理
     let currentAttachments: MessageAttachment[] = [];
@@ -3826,6 +3830,40 @@
         contextMenuY = event.clientY;
         contextMenuMessageIndex = messageIndex;
         contextMenuMessageType = messageType;
+        // 判断当前是否有选区，且选区位于当前消息元素内
+        try {
+            const sel = window.getSelection();
+            selectionInMessage = false;
+            selectionHtml = '';
+            selectionText = '';
+
+            if (sel && !sel.isCollapsed) {
+                const currentTarget = event.currentTarget as HTMLElement | null;
+                if (currentTarget) {
+                    const anchorNode = sel.anchorNode;
+                    const focusNode = sel.focusNode;
+                    if (anchorNode && focusNode) {
+                        const anchorEl = (anchorNode as Node).parentElement;
+                        const focusEl = (focusNode as Node).parentElement;
+                        if (anchorEl && focusEl && currentTarget.contains(anchorEl) && currentTarget.contains(focusEl)) {
+                            selectionInMessage = true;
+                            // 获取选区的 HTML
+                            const range = sel.getRangeAt(0);
+                            const div = document.createElement('div');
+                            div.appendChild(range.cloneContents());
+                            selectionHtml = div.innerHTML;
+                            selectionText = sel.toString();
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Context menu selection detection failed:', err);
+            selectionInMessage = false;
+            selectionHtml = '';
+            selectionText = '';
+        }
+
         contextMenuVisible = true;
     }
 
@@ -3837,19 +3875,70 @@
     }
 
     // 处理右键菜单项点击
-    function handleContextMenuAction(action: 'copy' | 'edit' | 'delete' | 'regenerate' | 'save') {
+    async function handleContextMenuAction(action: 'copy' | 'copy_md' | 'copy_plain' | 'copy_html' | 'edit' | 'delete' | 'regenerate' | 'save') {
         if (contextMenuMessageIndex === null) return;
 
         const messageIndex = contextMenuMessageIndex;
         closeContextMenu();
 
         switch (action) {
-            case 'copy':
+            case 'copy': {
+                // 旧行为：复制整条消息文本
                 const message = messages[messageIndex];
                 if (message) {
                     copyMessage(message.content);
                 }
                 break;
+            }
+            case 'copy_md':
+            case 'copy_plain':
+            case 'copy_html': {
+                // 如果有选区且选区属于消息，按类型复制选区
+                if (selectionInMessage && selectionText) {
+                    try {
+                        if (action === 'copy_md') {
+                            // Markdown: 尝试使用 Lute 转换 HTML->Markdown
+                            if (window.Lute) {
+                                const lute = window.Lute.New();
+                                const md = lute.HTML2Md(selectionHtml || selectionText);
+                                await navigator.clipboard.writeText(md);
+                                pushMsg(t('aiSidebar.success.copySuccess'));
+                            } else {
+                                // 降级为纯文本
+                                await navigator.clipboard.writeText(selectionText);
+                                pushMsg(t('aiSidebar.success.copySuccess'));
+                            }
+                        } else if (action === 'copy_plain') {
+                            await navigator.clipboard.writeText(selectionText);
+                            pushMsg(t('aiSidebar.success.copySuccess'));
+                        } else if (action === 'copy_html') {
+                            // 尝试写入富文本（text/html + text/plain）
+                            if (navigator.clipboard && (navigator.clipboard as any).write) {
+                                const blobPlain = new Blob([selectionText], { type: 'text/plain' });
+                                const blobHtml = new Blob([selectionHtml || selectionText], { type: 'text/html' });
+                                const item: any = new ClipboardItem({ 'text/plain': blobPlain, 'text/html': blobHtml });
+                                await (navigator.clipboard as any).write([item]);
+                                pushMsg(t('aiSidebar.success.copySuccess'));
+                            } else {
+                                // 回退到纯文本
+                                await navigator.clipboard.writeText(selectionText);
+                                pushMsg(t('aiSidebar.success.copySuccess'));
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Copy selection failed:', err);
+                        pushErrMsg(t('aiSidebar.errors.copyFailed'));
+                    }
+                } else {
+                    pushErrMsg(t('aiSidebar.errors.noSelection'));
+                }
+
+                // 清理选区状态
+                selectionInMessage = false;
+                selectionHtml = '';
+                selectionText = '';
+                break;
+            }
             case 'edit':
                 startEditMessage(messageIndex);
                 break;
@@ -7755,13 +7844,37 @@
             class="ai-sidebar__context-menu"
             style="left: {contextMenuX}px; top: {contextMenuY}px;"
         >
-            <button
-                class="ai-sidebar__context-menu-item"
-                on:click={() => handleContextMenuAction('copy')}
-            >
-                <svg class="b3-button__icon"><use xlink:href="#iconCopy"></use></svg>
-                <span>{t('aiSidebar.actions.copyMessage')}</span>
-            </button>
+            {#if selectionInMessage}
+                <button
+                    class="ai-sidebar__context-menu-item"
+                    on:click={() => handleContextMenuAction('copy_md')}
+                >
+                    <svg class="b3-button__icon"><use xlink:href="#iconCopy"></use></svg>
+                    <span>复制（Markdown，默认）</span>
+                </button>
+                <button
+                    class="ai-sidebar__context-menu-item"
+                    on:click={() => handleContextMenuAction('copy_plain')}
+                >
+                    <svg class="b3-button__icon"><use xlink:href="#iconCopy"></use></svg>
+                    <span>复制（纯文本）</span>
+                </button>
+                <button
+                    class="ai-sidebar__context-menu-item"
+                    on:click={() => handleContextMenuAction('copy_html')}
+                >
+                    <svg class="b3-button__icon"><use xlink:href="#iconCopy"></use></svg>
+                    <span>复制（富文本）</span>
+                </button>
+            {:else}
+                <button
+                    class="ai-sidebar__context-menu-item"
+                    on:click={() => handleContextMenuAction('copy')}
+                >
+                    <svg class="b3-button__icon"><use xlink:href="#iconCopy"></use></svg>
+                    <span>{t('aiSidebar.actions.copyMessage')}</span>
+                </button>
+            {/if}
             <button
                 class="ai-sidebar__context-menu-item"
                 on:click={() => handleContextMenuAction('edit')}
