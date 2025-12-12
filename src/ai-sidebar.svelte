@@ -1844,6 +1844,23 @@
             messagesToSend.unshift({ role: 'system', content: settings.aiSystemPrompt });
         }
 
+        // 使用临时系统提示词（如果设置了）
+        if (tempModelSettings.systemPrompt.trim()) {
+            // 如果已有系统提示词，替换它；否则添加新的
+            const systemMsgIndex = messagesToSend.findIndex(msg => msg.role === 'system');
+            if (systemMsgIndex !== -1) {
+                messagesToSend[systemMsgIndex].content = tempModelSettings.systemPrompt;
+            } else {
+                messagesToSend.unshift({ role: 'system', content: tempModelSettings.systemPrompt });
+            }
+        }
+
+        // 限制上下文消息数量
+        const systemMessages = messagesToSend.filter(msg => msg.role === 'system');
+        const otherMessages = messagesToSend.filter(msg => msg.role !== 'system');
+        const limitedMessages = otherMessages.slice(-tempModelSettings.contextCount);
+        messagesToSend = [...systemMessages, ...limitedMessages];
+
         return messagesToSend;
     }
 
