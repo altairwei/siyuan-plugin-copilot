@@ -4042,9 +4042,16 @@
                 // 旧行为：复制整条消息文本（或多模型整条响应）
                 if (contextMenuIsMultiModel) {
                     try {
-                        const el = document.elementFromPoint(contextMenuX, contextMenuY) as HTMLElement | null;
-                        const container = el?.closest('.ai-sidebar__multi-model-card-content, .ai-sidebar__multi-model-tab-panel-content') as HTMLElement | null;
-                        const text = container ? container.innerText : (multiModelResponses[messageIndex]?.content || '');
+                        const el = document.elementFromPoint(
+                            contextMenuX,
+                            contextMenuY
+                        ) as HTMLElement | null;
+                        const container = el?.closest(
+                            '.ai-sidebar__multi-model-card-content, .ai-sidebar__multi-model-tab-panel-content'
+                        ) as HTMLElement | null;
+                        const text = container
+                            ? container.innerText
+                            : multiModelResponses[messageIndex]?.content || '';
                         await navigator.clipboard.writeText(text);
                         pushMsg(t('aiSidebar.success.copySuccess'));
                     } catch (err) {
@@ -4107,10 +4114,19 @@
                     // 如果是多模型区域且没有选区，复制整个多模型响应内容
                     if (contextMenuIsMultiModel) {
                         try {
-                            const el = document.elementFromPoint(contextMenuX, contextMenuY) as HTMLElement | null;
-                            const container = el?.closest('.ai-sidebar__multi-model-card-content, .ai-sidebar__multi-model-tab-panel-content') as HTMLElement | null;
-                            const html = container ? container.innerHTML : (multiModelResponses[messageIndex]?.content || '');
-                            const text = container ? container.innerText : (multiModelResponses[messageIndex]?.content || '');
+                            const el = document.elementFromPoint(
+                                contextMenuX,
+                                contextMenuY
+                            ) as HTMLElement | null;
+                            const container = el?.closest(
+                                '.ai-sidebar__multi-model-card-content, .ai-sidebar__multi-model-tab-panel-content'
+                            ) as HTMLElement | null;
+                            const html = container
+                                ? container.innerHTML
+                                : multiModelResponses[messageIndex]?.content || '';
+                            const text = container
+                                ? container.innerText
+                                : multiModelResponses[messageIndex]?.content || '';
 
                             if (action === 'copy_md') {
                                 if (window.Lute) {
@@ -4127,7 +4143,9 @@
                             } else if (action === 'copy_html') {
                                 if (navigator.clipboard && (navigator.clipboard as any).write) {
                                     const blobPlain = new Blob([text], { type: 'text/plain' });
-                                    const blobHtml = new Blob([html || text], { type: 'text/html' });
+                                    const blobHtml = new Blob([html || text], {
+                                        type: 'text/html',
+                                    });
                                     const item: any = new ClipboardItem({
                                         'text/plain': blobPlain,
                                         'text/html': blobHtml,
@@ -7235,10 +7253,11 @@
 
                                 <div
                                     class="ai-sidebar__multi-model-card-content b3-typography"
-                                        style={messageFontSize
-                                            ? `font-size: ${messageFontSize}px;`
-                                            : ''}
-                                        on:contextmenu={e => handleContextMenu(e, index, 'assistant', true)}
+                                    style={messageFontSize
+                                        ? `font-size: ${messageFontSize}px;`
+                                        : ''}
+                                    on:contextmenu={e =>
+                                        handleContextMenu(e, index, 'assistant', true)}
                                 >
                                     {#if response.error}
                                         <div class="ai-sidebar__multi-model-card-error">
@@ -7395,10 +7414,16 @@
 
                                     <div
                                         class="ai-sidebar__multi-model-tab-panel-content b3-typography"
-                                            style={messageFontSize
-                                                ? `font-size: ${messageFontSize}px;`
-                                                : ''}
-                                            on:contextmenu={e => handleContextMenu(e, selectedTabIndex, 'assistant', true)}
+                                        style={messageFontSize
+                                            ? `font-size: ${messageFontSize}px;`
+                                            : ''}
+                                        on:contextmenu={e =>
+                                            handleContextMenu(
+                                                e,
+                                                selectedTabIndex,
+                                                'assistant',
+                                                true
+                                            )}
                                     >
                                         {#if response.error}
                                             <div class="ai-sidebar__multi-model-tab-panel-error">
