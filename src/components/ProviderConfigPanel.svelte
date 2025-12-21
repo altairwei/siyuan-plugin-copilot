@@ -25,6 +25,52 @@
     let editingName = providerName;
     let showApiKey = false; // 控制 API Key 是否显示明文
     let showAdvancedConfig = false; // 控制高级设置是否显示
+    let customBodyErrors: { [modelId: string]: string | null } = {}; // 跟踪每个模型的 JSON 验证错误
+
+    // 验证 JSON 字符串（支持嵌套 JSON）
+    function validateJsonString(str: string): { valid: boolean; error?: string; formatted?: string } {
+        if (!str || !str.trim()) {
+            return { valid: true };
+        }
+        try {
+            const parsed = JSON.parse(str);
+            // 确保是对象类型
+            if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+                return { valid: false, error: '必须是 JSON 对象格式' };
+            }
+            // 返回格式化的 JSON（保持嵌套结构）
+            return { valid: true, formatted: JSON.stringify(parsed, null, 2) };
+        } catch (e: any) {
+            // 提取更友好的错误信息
+            const message = e.message || '无效的 JSON 格式';
+            // 尝试提取位置信息
+            const posMatch = message.match(/position\s+(\d+)/i);
+            if (posMatch) {
+                const pos = parseInt(posMatch[1]);
+                return { valid: false, error: `JSON 格式错误：第 ${pos} 个字符处` };
+            }
+            return { valid: false, error: `JSON 格式错误：${message}` };
+        }
+    }
+
+    // 处理 customBody 更新，带验证
+    function handleCustomBodyChange(modelId: string, value: string) {
+        const result = validateJsonString(value);
+        customBodyErrors[modelId] = result.valid ? null : result.error || null;
+        customBodyErrors = { ...customBodyErrors };
+        updateModel(modelId, 'customBody', value);
+    }
+
+    // 格式化 JSON
+    function formatCustomBodyJson(modelId: string, currentValue: string) {
+        const result = validateJsonString(currentValue);
+        if (result.valid && result.formatted) {
+            updateModel(modelId, 'customBody', result.formatted);
+            customBodyErrors[modelId] = null;
+            customBodyErrors = { ...customBodyErrors };
+            pushMsg('JSON 已格式化');
+        }
+    }
 
     // 确保 advancedConfig 存在
     $: {
@@ -532,15 +578,33 @@
                             />
                         </div>
                         <div class="model-config-item">
-                            <span>{t('models.customBody')} </span>
+                            <div class="custom-body-header">
+                                <span>{t('models.customBody')} </span>
+                                {#if model.customBody && validateJsonString(model.customBody).valid}
+                                    <button 
+                                        class="format-json-btn"
+                                        title="格式化 JSON"
+                                        on:click={() => formatCustomBodyJson(model.id, model.customBody || '')}
+                                    >
+                                        <svg class="b3-button__icon" style="width: 12px; height: 12px; color: var(--b3-theme-on-surface);">
+                                            <use xlink:href="#iconFormat"></use>
+                                        </svg>
+                                    </button>
+                                {/if}
+                            </div>
                             <textarea
-                                class="b3-text-field"
-                                style="height: 60px; resize: vertical;"
+                                class="b3-text-field custom-body-textarea"
+                                class:json-error={customBodyErrors[model.id]}
+                                class:json-valid={model.customBody && !customBodyErrors[model.id] && validateJsonString(model.customBody).valid}
+                                style="height: 80px; resize: vertical; font-family: monospace; font-size: 12px;"
                                 value={model.customBody || ''}
-                                placeholder={'{ "key": "value" }'}
-                                on:change={(e) =>
-                                    updateModel(model.id, 'customBody', e.currentTarget.value)}
+                                placeholder={'支持嵌套 JSON，例如：\n{\n  "key": "value",\n  "nested": { "a": 1 }\n}'}
+                                on:input={(e) =>
+                                    handleCustomBodyChange(model.id, e.currentTarget.value)}
                             />
+                            {#if customBodyErrors[model.id]}
+                                <div class="json-error-hint">{customBodyErrors[model.id]}</div>
+                            {/if}
                         </div>
                         <div class="model-config-item">
                             <span>{t('models.capabilities')}</span>
@@ -1078,5 +1142,50 @@
         background: var(--b3-theme-surface);
         border-radius: 4px;
         border-left: 3px solid var(--b3-theme-primary);
+    }
+
+    // 自定义参数 JSON 样式
+    .custom-body-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .format-json-btn {
+        padding: 2px 4px;
+        border-radius: 4px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+        
+        &:hover {
+            opacity: 1;
+            background: var(--b3-theme-surface);
+        }
+    }
+
+    .custom-body-textarea {
+        white-space: pre;
+        tab-size: 2;
+        
+        &.json-error {
+            border-color: var(--b3-theme-error) !important;
+            background-color: color-mix(in srgb, var(--b3-theme-error) 5%, transparent);
+        }
+        
+        &.json-valid {
+            border-color: var(--b3-theme-success, #52c41a) !important;
+        }
+    }
+
+    .json-error-hint {
+        font-size: 11px;
+        color: var(--b3-theme-error);
+        margin-top: 4px;
+        padding: 4px 8px;
+        background: color-mix(in srgb, var(--b3-theme-error) 10%, transparent);
+        border-radius: 4px;
     }
 </style>
