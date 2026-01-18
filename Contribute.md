@@ -1,0 +1,1 @@
+- `src\tools\index.ts`: agent 模式调用的工具实现代码
