@@ -2167,7 +2167,7 @@
                     apiKey: providerConfig.apiKey,
                     model: modelConfig.id,
                     messages: [{ role: 'user', content: prompt }],
-                    temperature: 0.7,
+                    temperature: modelConfig.temperature,
                     maxTokens: 50,
                     stream: true,
                     onChunk: async (chunk: string) => {
