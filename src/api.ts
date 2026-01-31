@@ -507,6 +507,7 @@ export async function getFile(path: string): Promise<any> {
  */
 export const getFileBlob = async (path: string): Promise<Blob | null> => {
     const endpoint = '/api/file/getFile'
+    try {
         let response = await fetch(endpoint, {
             method: 'POST',
             body: JSON.stringify({
@@ -516,8 +517,32 @@ export const getFileBlob = async (path: string): Promise<Blob | null> => {
         if (!response.ok) {
             return null;
         }
-    let data = await response.blob();
-    return data;
+
+        let blob = await response.blob();
+
+        // 检查是否为 JSON 格式的错误信息
+        // 只有当 Content-Type 是 json 时才检查
+        if (blob.type.includes('application/json')) {
+            const text = await blob.text();
+            try {
+                const json = JSON.parse(text);
+                // SiYuan 错误响应通常包含 code 非 0
+                if (typeof json.code === 'number' && json.code !== 0) {
+                    return null;
+                }
+                // 是有效的 JSON 文件内容，重建 Blob
+                return new Blob([text], { type: blob.type });
+            } catch (e) {
+                // 解析失败，可能是普通文本，直接返回原始 blob
+                return blob;
+            }
+        }
+
+        return blob;
+    } catch (e) {
+        console.error('getFileBlob error:', e);
+        return null;
+    }
 }
 
 
@@ -527,8 +552,23 @@ export async function putFile(path: string, isDir: boolean, file: any) {
     form.append('isDir', isDir.toString());
     form.append('modTime', Date.now().toString());
     form.append('file', file);
-    let url = '/api/file/putFile';
-    return request(url, form);
+
+    // 使用 fetch 直接发送 FormData，避免 fetchSyncPost 可能的 JSON 处理问题
+    try {
+        const response = await fetch('/api/file/putFile', {
+            method: 'POST',
+            body: form
+        });
+        const res = await response.json();
+        if (res.code === 0) {
+            // 如果成功且 data 为 null，返回 true 以便调用者知道成功了
+            return res.data ?? true;
+        }
+        return null;
+    } catch (e) {
+        console.error('putFile error:', e);
+        return null;
+    }
 }
 
 export async function removeFile(path: string) {
