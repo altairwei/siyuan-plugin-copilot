@@ -81,6 +81,9 @@
     // 模型搜索筛选
     let modelSearchQuery = '';
 
+    // 预设搜索筛选
+    let presetSearchQuery = '';
+
     type AvailableModel = {
         provider: string;
         modelId: string;
@@ -103,15 +106,36 @@
             const terms = q.split(/\s+/).filter(Boolean);
             filteredModels = all.filter(m => {
                 const hay = (
-                    (m.modelName || '') + ' ' +
-                    (m.modelId || '') + ' ' +
-                    (m.providerName || '') + ' ' +
+                    (m.modelName || '') +
+                    ' ' +
+                    (m.modelId || '') +
+                    ' ' +
+                    (m.providerName || '') +
+                    ' ' +
                     (m.provider || '')
                 ).toLowerCase();
                 return terms.every(term => hay.includes(term));
             });
         }
     }
+
+    // 响应式过滤后的预设列表（支持空格分隔的 AND 搜索）
+    $: filteredPresets = ((): Preset[] => {
+        const q = presetSearchQuery.trim().toLowerCase();
+        if (!q) return presets;
+        const terms = q.split(/\s+/).filter(Boolean);
+        return presets.filter(preset => {
+            const hay = (
+                (preset.name || '') + ' ' +
+                (preset.systemPrompt || '') + ' ' +
+                (preset.chatMode || '') + ' ' +
+                (preset.selectedModels || []).map(m => getModelDisplayName(m.provider, m.modelId)).join(' ') + ' ' +
+                (preset.selectedModels || []).map(m => m.provider).join(' ') + ' ' +
+                (preset.selectedModels || []).map(m => m.modelId).join(' ')
+            ).toLowerCase();
+            return terms.every(term => hay.includes(term));
+        });
+    })();
 
     // 获取当前模型配置
     function getCurrentModelConfig() {
@@ -290,6 +314,10 @@
         await saveSelectedPresetId(preset.id);
 
         pushMsg(t('aiSidebar.modelSettings.presetSaved'));
+
+        // 关闭设置面板
+        isSettingsOpen = false;
+        openPresetList();
     }
 
     // 选择预设（直接应用，不打开设置面板）
@@ -553,10 +581,7 @@
             modelThinkingSettings: tempModelThinkingSettings,
         });
 
-        // 更新预设（如果是编辑现有预设）
-        if (editingPresetId) {
-            updatePreset(editingPresetId);
-        }
+        // 注意：编辑预设时不自动保存，只有点击保存按钮才保存
     }
 
     // 比较两个模型数组是否相等
@@ -602,6 +627,10 @@
             await savePresetsToStorage();
             // 触发响应式更新
             presets = [...presets];
+
+            // 关闭设置面板
+            isSettingsOpen = false;
+            openPresetList();
         }
     }
 
@@ -662,6 +691,7 @@
         tempModelThinkingSettings = {};
         editingPresetId = '';
         selectedPresetId = '';
+        newPresetName = ''; // 重置预设名称为空
         await saveSelectedPresetId('');
     }
 
@@ -890,26 +920,38 @@
                     </button>
                 </div>
 
+                <!-- 预设搜索框 -->
+                {#if presets.length > 0}
+                    <div class="model-settings-preset-search">
+                        <input
+                            type="text"
+                            class="b3-text-field"
+                            placeholder={t('aiSidebar.modelSettings.searchPresets') || '搜索预设'}
+                            bind:value={presetSearchQuery}
+                        />
+                    </div>
+                {/if}
+
                 <!-- 预设列表 -->
                 {#if presets.length > 0}
-                    <div class="model-settings-preset-list-items">
-                        {#each presets as preset, index}
-                            <div
-                                class="model-settings-preset-list-item"
-                                class:selected={selectedPresetId === preset.id}
-                                draggable="true"
-                                on:dragstart|stopPropagation={e =>
-                                    handleDragStart(e, index)}
-                                on:dragover|preventDefault|stopPropagation={e =>
-                                    handleDragOver(e, index)}
-                                on:drop|stopPropagation={e => handleDrop(e, index)}
-                                on:dragend={handleDragEnd}
-                                class:drag-over={dragOverIndex === index}
-                                class:drag-over-above={dragOverIndex === index &&
-                                    dragDirection === 'above'}
-                                class:drag-over-below={dragOverIndex === index &&
-                                    dragDirection === 'below'}
-                            >
+                    {#if filteredPresets.length > 0}
+                        <div class="model-settings-preset-list-items">
+                            {#each filteredPresets as preset, index}
+                                <div
+                                    class="model-settings-preset-list-item"
+                                    class:selected={selectedPresetId === preset.id}
+                                    draggable="true"
+                                    on:dragstart|stopPropagation={e => handleDragStart(e, index)}
+                                    on:dragover|preventDefault|stopPropagation={e =>
+                                        handleDragOver(e, index)}
+                                    on:drop|stopPropagation={e => handleDrop(e, index)}
+                                    on:dragend={handleDragEnd}
+                                    class:drag-over={dragOverIndex === index}
+                                    class:drag-over-above={dragOverIndex === index &&
+                                        dragDirection === 'above'}
+                                    class:drag-over-below={dragOverIndex === index &&
+                                        dragDirection === 'below'}
+                                >
                                 <div
                                     class="model-settings-preset-list-item-info"
                                     on:click={() => selectPreset(preset.id)}
@@ -929,18 +971,24 @@
                                         <div class="model-settings-preset-details">
                                             {t('aiSidebar.modelSettings.contextCount')}: {preset.contextCount}
                                             {#if preset.temperatureEnabled ?? true}
-                                                | {t('aiSidebar.modelSettings.temperature')}: {preset.temperature.toFixed(2)}
+                                                | {t('aiSidebar.modelSettings.temperature')}: {preset.temperature.toFixed(
+                                                    2
+                                                )}
                                             {/if}
                                             {#if preset.chatMode}
-                                                | {t('aiSidebar.modelSettings.chatMode')}: {t(`aiSidebar.mode.${preset.chatMode}`) || preset.chatMode}
+                                                | {t('aiSidebar.modelSettings.chatMode')}: {t(
+                                                    `aiSidebar.mode.${preset.chatMode}`
+                                                ) || preset.chatMode}
                                             {/if}
                                             {#if preset.modelSelectionEnabled && preset.selectedModels && preset.selectedModels.length > 0}
                                                 <br />
                                                 <span class="model-settings-preset-models">
                                                     {#if preset.enableMultiModel}
-                                                        {t('aiSidebar.modelSettings.multiModel') || '多模型'}:
+                                                        {t('aiSidebar.modelSettings.multiModel') ||
+                                                            '多模型'}:
                                                     {:else}
-                                                        {t('aiSidebar.modelSettings.model') || '模型'}:
+                                                        {t('aiSidebar.modelSettings.model') ||
+                                                            '模型'}:
                                                     {/if}
                                                     {preset.selectedModels
                                                         .map(m => {
@@ -964,7 +1012,8 @@
                                     <button
                                         class="b3-button b3-button--text"
                                         on:click|stopPropagation={() => editPreset(preset.id)}
-                                        title={t('aiSidebar.modelSettings.editPreset') || '编辑预设'}
+                                        title={t('aiSidebar.modelSettings.editPreset') ||
+                                            '编辑预设'}
                                     >
                                         <svg class="b3-button__icon">
                                             <use xlink:href="#iconEdit"></use>
@@ -983,6 +1032,15 @@
                             </div>
                         {/each}
                     </div>
+                    {:else if presetSearchQuery.trim()}
+                        <div class="model-settings-preset-list-empty">
+                            {t('aiSidebar.modelSettings.noResults') || '无匹配结果'}
+                        </div>
+                    {:else}
+                        <div class="model-settings-preset-list-empty">
+                            {t('aiSidebar.modelSettings.noPresets')}
+                        </div>
+                    {/if}
                 {:else}
                     <div class="model-settings-preset-list-empty">
                         {t('aiSidebar.modelSettings.noPresets')}
@@ -1001,10 +1059,27 @@
             on:click|stopPropagation
         >
             <div class="model-settings-header">
+                <div class="model-settings-header-left">
+                    {#if editingPresetId}
+                        <button
+                            class="b3-button b3-button--primary"
+                            on:click={() => updatePreset(editingPresetId)}
+                        >
+                            {t('aiSidebar.modelSettings.savePreset') || '保存预设'}
+                        </button>
+                    {:else}
+                        <button
+                            class="b3-button b3-button--primary"
+                            on:click={saveAsPreset}
+                        >
+                            {t('aiSidebar.modelSettings.savePreset') || '保存预设'}
+                        </button>
+                    {/if}
+                </div>
                 <h4>
                     {editingPresetId
-                        ? (t('aiSidebar.modelSettings.editPreset') || '编辑预设')
-                        : (t('aiSidebar.modelSettings.createNewPreset') || '新建预设')}
+                        ? t('aiSidebar.modelSettings.editPreset') || '编辑预设'
+                        : t('aiSidebar.modelSettings.createNewPreset') || '新建预设'}
                 </h4>
                 <div class="model-settings-header-actions">
                     <button
@@ -1044,14 +1119,6 @@
                             class="b3-text-field"
                             placeholder={t('aiSidebar.modelSettings.enterPresetName')}
                         />
-                        {#if !editingPresetId}
-                            <button
-                                class="b3-button b3-button--primary"
-                                on:click={saveAsPreset}
-                            >
-                                {t('aiSidebar.modelSettings.savePreset')}
-                            </button>
-                        {/if}
                     </div>
                 </div>
 
@@ -1090,7 +1157,8 @@
                             class="b3-switch"
                         />
                         <label for="temperature-enabled">
-                            {t('aiSidebar.modelSettings.enableTemperature') || '启用Temperature调整'}
+                            {t('aiSidebar.modelSettings.enableTemperature') ||
+                                '启用Temperature调整'}
                         </label>
                     </div>
                     <input
@@ -1145,7 +1213,8 @@
                         <option value="agent">{t('aiSidebar.mode.agent') || 'Agent模式'}</option>
                     </select>
                     <div class="model-settings-hint">
-                        {t('aiSidebar.modelSettings.chatModeHint') || '选择聊天模式，只有问答模式支持多模型'}
+                        {t('aiSidebar.modelSettings.chatModeHint') ||
+                            '选择聊天模式，只有问答模式支持多模型'}
                     </div>
                 </div>
 
@@ -1306,13 +1375,16 @@
                                     <input
                                         type="text"
                                         class="b3-text-field"
-                                        placeholder={t('aiSidebar.modelSettings.searchModels') || '搜索模型'}
+                                        placeholder={t('aiSidebar.modelSettings.searchModels') ||
+                                            '搜索模型'}
                                         bind:value={modelSearchQuery}
                                     />
                                 </div>
 
                                 {#if modelSearchQuery.trim() && filteredModels.length === 0}
-                                    <div class="model-settings-no-results">{t('aiSidebar.modelSettings.noResults') || '无匹配结果'}</div>
+                                    <div class="model-settings-no-results">
+                                        {t('aiSidebar.modelSettings.noResults') || '无匹配结果'}
+                                    </div>
                                 {/if}
 
                                 {#each filteredModels as model}
@@ -1635,6 +1707,12 @@
         }
     }
 
+    .model-settings-header-left {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
     .model-settings-header-actions {
         display: flex;
         align-items: center;
@@ -1702,20 +1780,6 @@
         font-size: 12px;
     }
 
-    .model-settings-preset-new {
-        display: flex;
-        gap: 8px;
-
-        input {
-            flex: 1;
-        }
-
-        button {
-            white-space: nowrap;
-            font-size: 12px;
-        }
-    }
-
     .model-settings-footer {
         display: flex;
         align-items: center;
@@ -1760,6 +1824,17 @@
     .model-settings-no-results {
         padding: 8px;
         color: var(--b3-theme-on-surface-light);
+        font-size: 12px;
+    }
+
+    .model-settings-preset-search {
+        display: flex;
+        padding: 6px 0;
+    }
+
+    .model-settings-preset-search .b3-text-field {
+        width: 100%;
+        padding: 6px 8px;
         font-size: 12px;
     }
 

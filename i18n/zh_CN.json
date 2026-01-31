@@ -238,6 +238,7 @@
             "createNewPreset": "新建预设",
             "editPreset": "编辑预设",
             "searchModels": "搜索模型",
+            "searchPresets": "搜索预设",
             "noResults": "无匹配结果"
         },
         "input": {
