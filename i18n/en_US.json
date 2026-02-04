@@ -402,7 +402,7 @@
             "moonshot": "Moonshot(Kimi)",
             "openai": "OpenAI",
             "volcano": "Volcano Engine",
-            "v3": "V3 API",
+            "aapi": "A API",
             "v3Description": "Providing stable and reliable API direct connection relay services for OpenAI ChatGPT, Gemini, Claude, Deepseek, Grok, etc."
         },
         "select": "Please select platform",

@@ -116,7 +116,7 @@ export interface ModelInfo {
     provider: string;
 }
 
-export type AIProvider = 'gemini' | 'deepseek' | 'openai' | 'moonshot' | 'volcano' | 'v3' | 'custom';
+export type AIProvider = 'gemini' | 'deepseek' | 'openai' | 'moonshot' | 'volcano' | 'aapi' | 'custom';
 
 // 思考努力程度到比例的映射（用于计算 token 预算）
 export const EFFORT_RATIO: Record<ThinkingEffort, number> = {
@@ -280,13 +280,13 @@ const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
         apiKeyHeader: 'Authorization',
         websiteUrl: 'https://console.volcengine.com/ark'
     },
-    v3: {
-        name: 'V3 API',
-        baseUrl: 'https://api.v3.cm',
+    aapi: {
+        name: 'AAPI',
+        baseUrl: 'https://api.achuan-2.top',
         modelsEndpoint: '/v1/models',
         chatEndpoint: '/v1/chat/completions',
         apiKeyHeader: 'Authorization',
-        websiteUrl: 'https://api.gpt.ge/register?aff=fQIZ'
+        websiteUrl: 'https://api.achuan-2.top/register?aff=fQIZ'
     },
     custom: {
         name: 'Custom',
@@ -352,7 +352,7 @@ export async function fetchModels(
     customApiUrl?: string,
     advancedConfig?: { customModelsUrl?: string; customChatUrl?: string }
 ): Promise<ModelInfo[]> {
-    const isBuiltIn = ['gemini', 'deepseek', 'openai', 'moonshot', 'volcano', 'v3'].includes(provider);
+    const isBuiltIn = ['gemini', 'deepseek', 'openai', 'moonshot', 'volcano', 'aapi'].includes(provider);
     const config = isBuiltIn ? PROVIDER_CONFIGS[provider as AIProvider] : PROVIDER_CONFIGS.custom;
 
     let url: string;
@@ -1093,7 +1093,7 @@ export async function chat(
     customApiUrl?: string,
     advancedConfig?: { customModelsUrl?: string; customChatUrl?: string }
 ): Promise<void> {
-    const isBuiltIn = ['gemini', 'deepseek', 'openai', 'moonshot', 'volcano', 'v3'].includes(provider);
+    const isBuiltIn = ['gemini', 'deepseek', 'openai', 'moonshot', 'volcano', 'aapi'].includes(provider);
     const config = isBuiltIn ? PROVIDER_CONFIGS[provider as AIProvider] : PROVIDER_CONFIGS.custom;
 
     let url: string;
@@ -1190,7 +1190,7 @@ export async function generateImage(
     customApiUrl?: string,
     advancedConfig?: { customModelsUrl?: string; customChatUrl?: string }
 ): Promise<ImageGenerationResult> {
-    const isBuiltIn = ['gemini', 'deepseek', 'openai', 'moonshot', 'volcano', 'v3'].includes(provider);
+    const isBuiltIn = ['gemini', 'deepseek', 'openai', 'moonshot', 'volcano', 'aapi'].includes(provider);
     const config = isBuiltIn ? PROVIDER_CONFIGS[provider as AIProvider] : PROVIDER_CONFIGS.custom;
 
     // 构建图片生成 API 的 URL

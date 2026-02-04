@@ -40,7 +40,7 @@
 
 <img alt="image" src="https://assets.b3logfile.com/siyuan/1610205759005/assets/image-20260118225029-2f5k1mt.png" />
 
-> 我自己主要用GPT5、Gemini 3.0、Claude 4.5 sonnet比较多，我使用的是[V3 API中转站](https://api.gpt.ge/register?aff=fQIZ)，按量付费，各个AI模型都能使用，比用官方的API能省不少钱，使用我的[邀请链接](https://api.gpt.ge/register?aff=fQIZ)注册可以获得$0.3余额奖励试用。
+> 我自己主要用GPT5、Gemini 3.0、Claude 4.5 sonnet比较多，我使用的是[A API中转站](https://api.achuan-2.top/register?aff=fQIZ)，按量付费，各个AI模型都能使用，比用官方的API能省不少钱，使用我的[邀请链接](https://api.achuan-2.top/register?aff=fQIZ)注册可以获得$0.3余额奖励试用。
 
 ### 多模态支持
 
@@ -109,9 +109,9 @@
 
 ## **注意事项**
 
-使用本插件需要自备 AI 平台的 API 密钥，插件本身不提供 AI 服务。请遵守各平台的使用条款和隐私政策。
+使用本插件需要自备 AI 平台的 API 密钥，插件本身不提供 AI 服务。请遵守各平台的使用条款和隐私政策，以及法律法规。
 
-> 如果有需要使用GPT、Gemini、Claude等国外顶级模型的朋友，推荐[V3 API网站](https://api.gpt.ge/register?aff=fQIZ)，非常好用，按量付费，各个AI模型都能使用，比用官方的API能省不少钱，使用我的[邀请链接](https://api.gpt.ge/register?aff=fQIZ)注册可以获得$0.3余额奖励试用。
+> 如果有需要使用GPT、Gemini、Claude等国外顶级模型的朋友，推荐[A API网站](https://api.achuan-2.top/register?aff=fQIZ)，非常好用，按量付费，各个AI模型都能使用，比用官方的API能省不少钱，使用我的[邀请链接](https://api.achuan-2.top/register?aff=fQIZ)注册可以获得$0.3余额奖励试用。
 
 ## 🔧 开发相关
 

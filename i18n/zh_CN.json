@@ -404,8 +404,8 @@
             "moonshot": "月之暗面 (Kimi)",
             "openai": "OpenAI",
             "volcano": "火山引擎",
-            "v3": "V3 API",
-            "v3Description": "为您提供稳定可靠的Openai ChatGPT、Gemini、Claude、Deepseek、Grok等API直连中转服务"
+            "aapi": "A API",
+            "aapiDescription": "为您提供稳定可靠的Openai ChatGPT、Gemini、Claude、Deepseek、Grok等API直连中转服务"
         },
         "select": "请选择平台",
         "selectHint": "请选择一个平台以查看或编辑其配置",

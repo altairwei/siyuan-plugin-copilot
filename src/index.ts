@@ -249,7 +249,49 @@ export default class PluginSample extends Plugin {
      * 加载设置
      */
     async loadSettings() {
-        const settings = await this.loadData(SETTINGS_FILE);
+        const settings = (await this.loadData(SETTINGS_FILE)) || {};
+
+        // 迁移：如果存在旧的 aiProviders.v3 配置，迁移为自定义平台（customProviders）
+        try {
+            if (settings.aiProviders && settings.aiProviders.v3) {
+                if (!settings.aiProviders.customProviders || !Array.isArray(settings.aiProviders.customProviders)) {
+                    settings.aiProviders.customProviders = [];
+                }
+
+                const legacy = settings.aiProviders.v3;
+                const newId = `v3`;
+                const newPlatform = {
+                    id: newId,
+                    name: legacy.name || 'V3 API',
+                    apiKey: legacy.apiKey || settings.aiApiKey || '',
+                    customApiUrl: legacy.customApiUrl || 'https://api.gpt.ge',
+                    models: legacy.models || []
+                };
+
+                settings.aiProviders.customProviders.push(newPlatform);
+
+                // 如果用户选中了旧的 v3 平台，切换到新创建的自定义平台
+                if (settings.selectedProviderId === 'v3') {
+                    settings.selectedProviderId = newId;
+                }
+                if (settings.currentProvider === 'v3') {
+                    settings.currentProvider = newId;
+                }
+
+                // 删除旧配置以避免重复使用
+                delete settings.aiProviders.v3;
+
+                // 如果存在老的单个平台字段，也一并清理（兼容旧版本）
+                if (settings.aiProvider === 'v3') delete settings.aiProvider;
+
+                // 持久化迁移结果
+                await this.saveData(SETTINGS_FILE, settings);
+                pushMsg('检测到旧的 V3 配置，已迁移为自定义平台');
+            }
+        } catch (e) {
+            console.error('Settings migration failed:', e);
+        }
+
         const defaultSettings = getDefaultSettings();
         const mergedSettings = { ...defaultSettings, ...settings };
         // 更新 store

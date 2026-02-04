@@ -65,7 +65,7 @@ export const getDefaultSettings = () => ({
             customApiUrl: '',
             models: []
         },
-        v3: {
+        aapi: {
             apiKey: '',
             customApiUrl: '',
             models: []
