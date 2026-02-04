@@ -175,44 +175,44 @@
 
     // 消息内容显示缓存（存储每个消息的显示内容，键为content的哈希）
     const messageDisplayCache = new Map<string, { loading: boolean; content: string }>();
-    
+
     // 获取content的简单哈希（用作缓存键）
     function getContentHash(content: string): string {
         let hash = 0;
         for (let i = 0; i < content.length; i++) {
             const char = content.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
+            hash = (hash << 5) - hash + char;
             hash = hash & hash;
         }
         return hash.toString();
     }
-    
+
     // 获取用于显示的消息内容（将 assets 路径替换为 blob URL）
     function getDisplayContent(content: string | MessageContent[]): string {
         const textContent = typeof content === 'string' ? content : getMessageText(content);
-        
+
         // 检查是否包含 assets 路径
         if (!textContent.includes('/data/storage/petal/siyuan-plugin-copilot/assets/')) {
             return formatMessage(textContent);
         }
-        
+
         // 使用content本身的哈希作为缓存键
         const cacheKey = getContentHash(textContent);
-        
+
         // 如果缓存中存在且已加载完成，直接返回
         const cached = messageDisplayCache.get(cacheKey);
         if (cached && !cached.loading) {
             return cached.content;
         }
-        
+
         // 如果正在加载，返回原始内容
         if (cached && cached.loading) {
             return formatMessage(textContent);
         }
-        
+
         // 标记为加载中
         messageDisplayCache.set(cacheKey, { loading: true, content: '' });
-        
+
         // 异步加载assets图片
         replaceAssetPathsWithBlob(textContent).then(processedContent => {
             const formattedContent = formatMessage(processedContent);
@@ -220,7 +220,7 @@
             // 触发重新渲染
             messages = [...messages];
         });
-        
+
         // 先返回原始内容
         return formatMessage(textContent);
     }
@@ -1924,7 +1924,8 @@
                             if (multiModelResponses[index]) {
                                 const convertedText = convertLatexToMarkdown(text);
                                 // 处理content中的base64图片，保存为assets文件
-                                const processedContent = await saveBase64ImagesInContent(convertedText);
+                                const processedContent =
+                                    await saveBase64ImagesInContent(convertedText);
                                 multiModelResponses[index].content = processedContent;
                                 multiModelResponses[index].thinking = thinking;
                                 multiModelResponses[index].isLoading = false;
@@ -2146,7 +2147,9 @@
                         while ((match = imageRegex.exec(content)) !== null) {
                             const url = match[1];
                             // 处理 assets 路径的图片
-                            if (url.startsWith('/data/storage/petal/siyuan-plugin-copilot/assets/')) {
+                            if (
+                                url.startsWith('/data/storage/petal/siyuan-plugin-copilot/assets/')
+                            ) {
                                 try {
                                     const blobUrl = await loadAsset(url);
                                     if (blobUrl) {
@@ -2823,7 +2826,9 @@
                         while ((match = imageRegex.exec(content)) !== null) {
                             const url = match[1];
                             // 处理 assets 路径的图片
-                            if (url.startsWith('/data/storage/petal/siyuan-plugin-copilot/assets/')) {
+                            if (
+                                url.startsWith('/data/storage/petal/siyuan-plugin-copilot/assets/')
+                            ) {
                                 try {
                                     const blobUrl = await loadAsset(url);
                                     if (blobUrl) {
@@ -3416,7 +3421,8 @@
                                     const convertedText = convertLatexToMarkdown(fullText);
 
                                     // 处理content中的base64图片，保存为assets文件
-                                    const processedContent = await saveBase64ImagesInContent(convertedText);
+                                    const processedContent =
+                                        await saveBase64ImagesInContent(convertedText);
 
                                     // 如果之前有工具调用，将最终回复存储到 finalReply 字段
                                     if (
@@ -3500,12 +3506,12 @@
                 }
             } else {
                 // 非 Agent 模式或没有工具，使用原来的逻辑
-                
+
                 // 检查是否启用图片生成
                 const enableImageGeneration = modelConfig.capabilities?.imageGeneration || false;
                 // 用于保存生成的图片
                 let generatedImages: any[] = [];
-                
+
                 await chat(
                     currentProvider,
                     {
@@ -3975,7 +3981,7 @@
         // 匹配 Markdown 图片语法中的 base64 数据
         const base64ImageRegex = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[^)]+)\)/g;
         const matches = Array.from(content.matchAll(base64ImageRegex));
-        
+
         if (matches.length === 0) {
             return content;
         }
@@ -3985,38 +3991,39 @@
             const fullMatch = match[0];
             const altText = match[1];
             const dataUrl = match[2];
-            
+
             try {
                 // 解析 data URL
                 const dataUrlMatch = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
                 if (!dataUrlMatch) continue;
-                
+
                 const mimeType = dataUrlMatch[1];
                 const base64Data = dataUrlMatch[2];
-                
+
                 // 保存到 assets
                 const blob = base64ToBlob(base64Data, mimeType);
                 const ext = mimeType.split('/')[1] || 'png';
                 const assetPath = await saveAsset(blob, `image-${Date.now()}.${ext}`);
-                
+
                 // 替换为 assets 路径
                 result = result.replace(fullMatch, `![${altText}](${assetPath})`);
-                
+
                 console.log(`Saved generated image to assets: ${assetPath}`);
             } catch (error) {
                 console.error('Failed to save base64 image:', error);
             }
         }
-        
+
         return result;
     }
 
     // 将消息内容中的 assets 路径替换为 blob URL（用于显示）
     async function replaceAssetPathsWithBlob(content: string): Promise<string> {
         // 匹配 Markdown 图片语法中的 assets 路径
-        const assetImageRegex = /!\[([^\]]*)\]\((\/data\/storage\/petal\/siyuan-plugin-copilot\/assets\/[^)]+)\)/g;
+        const assetImageRegex =
+            /!\[([^\]]*)\]\((\/data\/storage\/petal\/siyuan-plugin-copilot\/assets\/[^)]+)\)/g;
         const matches = Array.from(content.matchAll(assetImageRegex));
-        
+
         if (matches.length === 0) {
             return content;
         }
@@ -4026,7 +4033,7 @@
             const fullMatch = match[0];
             const altText = match[1];
             const assetPath = match[2];
-            
+
             try {
                 const blobUrl = await loadAsset(assetPath);
                 if (blobUrl) {
@@ -4036,7 +4043,7 @@
                 console.error('Failed to load asset for display:', error);
             }
         }
-        
+
         return result;
     }
 
@@ -6041,92 +6048,114 @@
                 for (const msg of loadedMessages) {
                     // 处理 content 中的 Markdown 格式 base64 图片
                     if (typeof msg.content === 'string' && msg.content.includes('data:image')) {
-                        const base64ImageRegex = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[^)]+)\)/g;
+                        const base64ImageRegex =
+                            /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[^)]+)\)/g;
                         let match;
-                        const imagesToProcess: Array<{ fullMatch: string; altText: string; dataUrl: string }> = [];
-                        
+                        const imagesToProcess: Array<{
+                            fullMatch: string;
+                            altText: string;
+                            dataUrl: string;
+                        }> = [];
+
                         // 收集所有需要处理的图片
                         while ((match = base64ImageRegex.exec(msg.content)) !== null) {
                             imagesToProcess.push({
                                 fullMatch: match[0],
                                 altText: match[1] || 'image',
-                                dataUrl: match[2]
+                                dataUrl: match[2],
                             });
                         }
-                        
+
                         // 处理每个图片
                         if (imagesToProcess.length > 0) {
                             let newContent = msg.content;
-                            
+
                             for (const imageInfo of imagesToProcess) {
                                 try {
                                     // 解析 data URL
-                                    const matches = imageInfo.dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+                                    const matches = imageInfo.dataUrl.match(
+                                        /^data:([^;]+);base64,(.+)$/
+                                    );
                                     if (!matches) continue;
-                                    
+
                                     const mimeType = matches[1];
                                     const base64Data = matches[2];
-                                    
+
                                     // 保存到 assets
                                     const blob = base64ToBlob(base64Data, mimeType);
                                     const ext = mimeType.split('/')[1] || 'png';
-                                    const assetPath = await saveAsset(blob, `image-${Date.now()}.${ext}`);
-                                    
+                                    const assetPath = await saveAsset(
+                                        blob,
+                                        `image-${Date.now()}.${ext}`
+                                    );
+
                                     // 替换为 assets 路径，保持 Markdown 格式
                                     newContent = newContent.replace(
                                         imageInfo.fullMatch,
                                         `![${imageInfo.altText}](${assetPath})`
                                     );
-                                    
+
                                     sessionModified = true;
-                                    console.log(`Migrated content base64 image to assets: ${assetPath}`);
+                                    console.log(
+                                        `Migrated content base64 image to assets: ${assetPath}`
+                                    );
                                 } catch (error) {
                                     console.error('Failed to migrate content base64 image:', error);
                                 }
                             }
-                            
+
                             // 更新消息内容
                             if (sessionModified) {
                                 msg.content = newContent;
                             }
                         }
                     }
-                    
+
                     if (msg.attachments) {
                         for (const att of msg.attachments) {
                             if (att.type === 'image') {
                                 if (att.path) {
                                     // 从路径加载图片
                                     att.data = (await loadAsset(att.path)) || '';
-                                } else if (att.data && (att.data.startsWith('data:image') || att.data.length > 1000)) {
+                                } else if (
+                                    att.data &&
+                                    (att.data.startsWith('data:image') || att.data.length > 1000)
+                                ) {
                                     // 旧格式：有 base64 数据但没有 path，自动迁移到 assets
                                     try {
                                         let base64Data = att.data;
                                         let mimeType = att.mimeType || 'image/png';
-                                        
+
                                         // 如果是 data URL，提取 mime type 和数据
                                         if (base64Data.startsWith('data:')) {
-                                            const matches = base64Data.match(/^data:([^;]+);base64,(.+)$/);
+                                            const matches = base64Data.match(
+                                                /^data:([^;]+);base64,(.+)$/
+                                            );
                                             if (matches) {
                                                 mimeType = matches[1];
                                                 base64Data = matches[2];
                                             }
                                         }
-                                        
+
                                         const blob = base64ToBlob(base64Data, mimeType);
                                         const ext = mimeType.split('/')[1] || 'png';
                                         const name = att.name || `image-${Date.now()}.${ext}`;
                                         const assetPath = await saveAsset(blob, name);
-                                        
+
                                         // 更新附件信息
                                         att.path = assetPath;
                                         att.data = URL.createObjectURL(blob); // 设置为 blob URL
                                         att.mimeType = mimeType;
-                                        
+
                                         sessionModified = true;
-                                        console.log(`Migrated attachment base64 image to assets: ${assetPath}`);
+                                        console.log(
+                                            `Migrated attachment base64 image to assets: ${assetPath}`
+                                        );
                                     } catch (error) {
-                                        console.error('Failed to migrate attachment base64 image:', error);
+                                        console.error(
+                                            'Failed to migrate attachment base64 image:',
+                                            error
+                                        );
                                     }
                                 }
                             } else if (att.path) {
@@ -6135,7 +6164,7 @@
                             }
                         }
                     }
-                    
+
                     if (msg.generatedImages) {
                         for (const img of msg.generatedImages) {
                             if (img.path) {
@@ -6144,16 +6173,20 @@
                             } else if (img.data && img.data.length > 0) {
                                 // 旧格式：有 base64 数据但没有 path，自动迁移到 assets
                                 try {
-                                    const blob = base64ToBlob(img.data, img.mimeType || 'image/png');
-                                    const ext = (img.mimeType || 'image/png').split('/')[1] || 'png';
+                                    const blob = base64ToBlob(
+                                        img.data,
+                                        img.mimeType || 'image/png'
+                                    );
+                                    const ext =
+                                        (img.mimeType || 'image/png').split('/')[1] || 'png';
                                     const name = `generated-image-${Date.now()}.${ext}`;
                                     const assetPath = await saveAsset(blob, name);
-                                    
+
                                     // 更新图片信息
                                     img.path = assetPath;
                                     img.data = ''; // 清空 base64 数据
                                     img.previewUrl = URL.createObjectURL(blob);
-                                    
+
                                     // 同时更新 attachments（如果存在）
                                     if (msg.attachments) {
                                         const attIndex = msg.attachments.findIndex(
@@ -6161,10 +6194,11 @@
                                         );
                                         if (attIndex !== -1) {
                                             msg.attachments[attIndex].path = assetPath;
-                                            msg.attachments[attIndex].data = URL.createObjectURL(blob);
+                                            msg.attachments[attIndex].data =
+                                                URL.createObjectURL(blob);
                                         }
                                     }
-                                    
+
                                     sessionModified = true;
                                     console.log(`Migrated generated image to assets: ${assetPath}`);
                                 } catch (error) {
@@ -7680,7 +7714,9 @@
                         while ((match = imageRegex.exec(content)) !== null) {
                             const url = match[1];
                             // 处理 assets 路径的图片
-                            if (url.startsWith('/data/storage/petal/siyuan-plugin-copilot/assets/')) {
+                            if (
+                                url.startsWith('/data/storage/petal/siyuan-plugin-copilot/assets/')
+                            ) {
                                 try {
                                     const blobUrl = await loadAsset(url);
                                     if (blobUrl) {
@@ -7878,10 +7914,7 @@
                         // 立即保存生成的图片到 SiYuan 资源文件夹并转换为 blob URL
                         generatedImages = await Promise.all(
                             images.map(async (img, idx) => {
-                                const blob = base64ToBlob(
-                                    img.data,
-                                    img.mimeType || 'image/png'
-                                );
+                                const blob = base64ToBlob(img.data, img.mimeType || 'image/png');
                                 const name = `generated-image-${Date.now()}-${idx + 1}.${
                                     img.mimeType?.split('/')[1] || 'png'
                                 }`;
@@ -8345,7 +8378,10 @@
                                                                 </span>
                                                             </div>
                                                             {#if !isCollapsed}
-                                                                {@const thinkingDisplay = getDisplayContent(response.thinking)}
+                                                                {@const thinkingDisplay =
+                                                                    getDisplayContent(
+                                                                        response.thinking
+                                                                    )}
                                                                 <div
                                                                     class="ai-message__thinking-content b3-typography"
                                                                 >
@@ -8374,7 +8410,8 @@
                                                                 {response.error}
                                                             </div>
                                                         {:else if response.content}
-                                                            {@const contentDisplay = getDisplayContent(response.content)}
+                                                            {@const contentDisplay =
+                                                                getDisplayContent(response.content)}
                                                             {@html contentDisplay}
                                                         {/if}
                                                     </div>
@@ -8911,7 +8948,9 @@
                                             </span>
                                         </div>
                                         {#if !response.thinkingCollapsed}
-                                            {@const streamCardThink = getDisplayContent(response.thinking)}
+                                            {@const streamCardThink = getDisplayContent(
+                                                response.thinking
+                                            )}
                                             <div class="ai-message__thinking-content b3-typography">
                                                 {@html streamCardThink}
                                             </div>
@@ -8932,7 +8971,9 @@
                                             {response.error}
                                         </div>
                                     {:else if response.content}
-                                        {@const streamCardContent = getDisplayContent(response.content)}
+                                        {@const streamCardContent = getDisplayContent(
+                                            response.content
+                                        )}
                                         {@html streamCardContent}
                                     {:else if response.isLoading}
                                         <div class="ai-sidebar__multi-model-card-loading">
@@ -9084,7 +9125,9 @@
                                                 </span>
                                             </div>
                                             {#if !response.thinkingCollapsed}
-                                                {@const streamTabThink = getDisplayContent(response.thinking)}
+                                                {@const streamTabThink = getDisplayContent(
+                                                    response.thinking
+                                                )}
                                                 <div
                                                     class="ai-message__thinking-content b3-typography"
                                                 >
@@ -9112,7 +9155,9 @@
                                                 {response.error}
                                             </div>
                                         {:else if response.content}
-                                            {@const streamTabContent = getDisplayContent(response.content)}
+                                            {@const streamTabContent = getDisplayContent(
+                                                response.content
+                                            )}
                                             {@html streamTabContent}
                                         {:else if response.isLoading}
                                             <div class="ai-sidebar__multi-model-tab-panel-loading">

@@ -100,7 +100,7 @@ export function base64ToBlob(base64: string, mimeType: string): Blob {
     if (base64.includes(',')) {
         base64Data = base64.split(',')[1];
     }
-    
+
     const byteString = atob(base64Data);
     const ab = new ArrayBuffer(byteString.length);
     const ia = new Uint8Array(ab);

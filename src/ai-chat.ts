@@ -886,7 +886,7 @@ async function handleStreamResponse(
                         if (delta?.images || delta?.image || json.images || json.image) {
                             const imageData = delta?.images || delta?.image || json.images || json.image;
                             const imageArray = Array.isArray(imageData) ? imageData : [imageData];
-                            
+
                             for (const img of imageArray) {
                                 if (img.b64_json || img.data) {
                                     generatedImages.push({
