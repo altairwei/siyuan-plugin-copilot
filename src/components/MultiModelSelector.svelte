@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { createEventDispatcher, onDestroy } from 'svelte';
+    import { createEventDispatcher, onDestroy, onMount } from 'svelte';
     import type { ProviderConfig, CustomProviderConfig } from '../defaultSettings';
     import { t } from '../utils/i18n';
 
@@ -7,6 +7,8 @@
     export let selectedModels: Array<{ provider: string; modelId: string }> = [];
     export let isOpen = false;
     export let enableMultiModel = false; // 是否启用多模型模式
+    export let currentProvider = ''; // 单选模式当前选中的提供商
+    export let currentModelId = ''; // 单选模式当前选中的模型
 
     const dispatch = createEventDispatcher();
 
@@ -31,13 +33,10 @@
     // 模型搜索筛选
     let modelSearchQuery = '';
 
-    // 当有搜索内容时，自动展开相关的provider分组
-    $: if (modelSearchQuery.trim()) {
-        filteredProviders.forEach(provider => {
-            expandedProviders.add(provider.id);
-        });
-        expandedProviders = expandedProviders; // 触发更新
-    }
+    // 容器宽度监听（用于单选模式自适应显示）
+    let containerWidth = 0;
+    let containerElement: HTMLElement;
+    let resizeObserver: ResizeObserver | null = null;
 
     // DOM references for positioning
     let buttonEl: HTMLElement | null = null;
@@ -47,20 +46,6 @@
     // 拖拽相关状态
     let draggedIndex: number | null = null;
     let dropIndicatorIndex: number | null = null;
-
-    // 生成模型唯一键
-    function getModelKey(provider: string, modelId: string): string {
-        return `${provider}:::${modelId}`;
-    }
-
-    // 解析模型键（保留以便将来使用）
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    function parseModelKey(key: string): { provider: string; modelId: string } {
-        const [provider, modelId] = key.split(':::');
-        return { provider, modelId };
-    }
-
-    // 移除 selectedModelSet 的初始化，因为现在允许重复选择同一个模型
 
     function getProviderList(): ProviderInfo[] {
         const list: ProviderInfo[] = [];
@@ -95,8 +80,8 @@
 
     // 响应式过滤后的提供商列表（支持空格分隔的 AND 搜索）
     $: filteredProviders = (() => {
-        // 确保依赖于 providers
-        const _providers = providers;
+        // 显式依赖 providers，确保其更新时重新计算
+        const _deps = providers;
         const query = modelSearchQuery.trim().toLowerCase();
         if (!query) {
             return getProviderList();
@@ -120,6 +105,24 @@
         }
     })();
 
+    // 展开逻辑：明确追踪所有依赖
+    $: if (isOpen) {
+        // 下拉框打开时的展开逻辑
+        const query = modelSearchQuery.trim();
+        
+        if (query) {
+            // 有搜索内容时，展开所有匹配的提供商
+            const newExpanded = new Set<string>();
+            filteredProviders.forEach(provider => {
+                newExpanded.add(provider.id);
+            });
+            expandedProviders = newExpanded;
+        } else {
+            // 没有搜索内容时，始终展开所有提供商
+            expandedProviders = new Set(filteredProviders.map(p => p.id));
+        }
+    }
+
     function toggleProvider(providerId: string) {
         if (expandedProviders.has(providerId)) {
             expandedProviders.delete(providerId);
@@ -130,9 +133,15 @@
     }
 
     function addModel(provider: string, modelId: string) {
-        // 总是添加模型，允许重复选择
-        selectedModels = [...selectedModels, { provider, modelId }];
-        dispatch('change', selectedModels);
+        if (enableMultiModel) {
+            // 多选模式：总是添加模型，允许重复选择
+            selectedModels = [...selectedModels, { provider, modelId }];
+            dispatch('change', selectedModels);
+        } else {
+            // 单选模式：选择模型后关闭下拉框
+            dispatch('select', { provider, modelId });
+            isOpen = false;
+        }
     }
 
     function toggleEnableMultiModel() {
@@ -346,11 +355,56 @@
         dispatch('toggleThinking', { provider, modelId, enabled: !currentEnabled });
     }
 
-    // 获取已选择模型的名称列表
-    function getSelectedModelNames(): string {
+    // 获取已选择模型的名称列表（响应式）
+    $: selectedModelNames = (() => {
         if (selectedModels.length === 0) return '';
         return selectedModels.map(m => getModelName(m.provider, m.modelId)).join('，');
+    })();
+
+    // 获取某个模型在选择列表中的数量
+    function getModelSelectionCount(provider: string, modelId: string): number {
+        if (!enableMultiModel) return 0;
+        return selectedModels.filter(m => m.provider === provider && m.modelId === modelId).length;
     }
+
+    // 减少模型选择次数（移除一个实例）
+    function decreaseModelSelection(provider: string, modelId: string, event: Event) {
+        event.stopPropagation(); // 阻止事件冒泡，避免触发模型选择
+        if (!enableMultiModel) return;
+        
+        // 找到第一个匹配的模型并移除
+        const index = selectedModels.findIndex(m => m.provider === provider && m.modelId === modelId);
+        if (index !== -1) {
+            const newModels = [...selectedModels];
+            newModels.splice(index, 1);
+            selectedModels = newModels;
+            dispatch('change', selectedModels);
+        }
+    }
+
+    // 单选模式：获取当前选中的模型名称
+    function getCurrentModelName(): string {
+        if (!currentProvider || !currentModelId) {
+            return t('models.selectPlaceholder');
+        }
+        return getModelName(currentProvider, currentModelId);
+    }
+
+    // 根据容器宽度自适应显示模型名称（单选模式）
+    $: displayModelName = (() => {
+        // 明确依赖这些变量以确保响应式更新
+        const _provider = currentProvider;
+        const _modelId = currentModelId;
+        const _width = containerWidth;
+        
+        const name = getCurrentModelName();
+        if (!name || name === t('models.selectPlaceholder')) return name;
+        // 如果容器宽度小于 200px，只显示模型名的前10个字符
+        if (_width > 0 && _width < 200) {
+            return name.length > 10 ? name.substring(0, 10) + '...' : name;
+        }
+        return name;
+    })();
 
     function closeOnOutsideClick(event: MouseEvent) {
         let target = event.target as HTMLElement;
@@ -393,6 +447,21 @@
     onDestroy(() => {
         document.removeEventListener('click', closeOnOutsideClick);
         if (_resizeHandler) window.removeEventListener('resize', _resizeHandler);
+        if (resizeObserver) {
+            resizeObserver.disconnect();
+        }
+    });
+
+    // 监听容器宽度变化（单选模式使用）
+    onMount(() => {
+        if (containerElement) {
+            resizeObserver = new ResizeObserver(entries => {
+                for (const entry of entries) {
+                    containerWidth = entry.contentRect.width;
+                }
+            });
+            resizeObserver.observe(containerElement);
+        }
     });
 
     // 根据触发按钮位置，调整下拉在窗口中的定位和最大高度，避免溢出
@@ -429,22 +498,26 @@
     }
 </script>
 
-<div class="multi-model-selector">
+<div class="multi-model-selector" bind:this={containerElement}>
     <button
         bind:this={buttonEl}
         class="multi-model-selector__button b3-button b3-button--text"
         class:multi-model-selector__button--active={enableMultiModel}
         on:click|stopPropagation={() => (isOpen = !isOpen)}
-        title={t('multiModel.title')}
+        title={enableMultiModel ? t('multiModel.title') : getCurrentModelName()}
     >
         <svg class="b3-button__icon">
             <use xlink:href="#iconLayout"></use>
         </svg>
         <span class="multi-model-selector__label">
-            {#if enableMultiModel && selectedModels.length > 0}
-                {t('multiModel.enabled')} ({selectedModels.length})
+            {#if enableMultiModel}
+                {#if selectedModels.length > 0}
+                    {t('multiModel.enabled')} ({selectedModels.length})
+                {:else}
+                    {t('multiModel.title')}
+                {/if}
             {:else}
-                {t('multiModel.title')}
+                {displayModelName}
             {/if}
         </span>
     </button>
@@ -453,7 +526,7 @@
         <div class="multi-model-selector__dropdown" bind:this={dropdownEl}>
             <div class="multi-model-selector__header">
                 <div class="multi-model-selector__title">
-                    {t('multiModel.selectModels')}
+                    {enableMultiModel ? t('multiModel.selectModels') : t('models.selectPlaceholder')}
                 </div>
                 <div
                     class="multi-model-selector__toggle"
@@ -476,24 +549,25 @@
                 </div>
             </div>
 
-            <div class="multi-model-selector__count-header">
-                <div class="multi-model-selector__count">
-                    {#if selectedModels.length > 0}
-                        {t('multiModel.selected')}: {selectedModels.length} ({getSelectedModelNames()})
-                    {:else}
-                        {t('multiModel.selected')}: {selectedModels.length}
-                    {/if}
-                </div>
-            </div>
-
-            {#if selectedModels.length > 0}
-                <div class="multi-model-selector__selected-header">
-                    <div class="multi-model-selector__selected-title">
-                        {t('multiModel.selectedModels')}
+            {#if enableMultiModel}
+                <div class="multi-model-selector__count-header">
+                    <div class="multi-model-selector__count">
+                        {#if selectedModels.length > 0}
+                            {t('multiModel.selected')}: {selectedModels.length} ({selectedModelNames})
+                        {:else}
+                            {t('multiModel.selected')}: {selectedModels.length}
+                        {/if}
                     </div>
                 </div>
 
-                <div class="multi-model-selector__selected-models">
+                {#if selectedModels.length > 0}
+                    <div class="multi-model-selector__selected-header">
+                        <div class="multi-model-selector__selected-title">
+                            {t('multiModel.selectedModels')}
+                        </div>
+                    </div>
+
+                    <div class="multi-model-selector__selected-models">
                     {#each selectedModels as model, index}
                         <!-- Drop indicator before this item -->
                         {#if dropIndicatorIndex === index}
@@ -600,7 +674,8 @@
                             class="multi-model-selector__drop-indicator multi-model-selector__drop-indicator--active"
                         ></div>
                     {/if}
-                </div>
+                    </div>
+                {/if}
             {/if}
 
             <div class="multi-model-selector__tree">
@@ -649,18 +724,37 @@
                                         class="multi-model-selector__model"
                                         role="button"
                                         tabindex="0"
+                                        class:multi-model-selector__model--active={!enableMultiModel &&
+                                            currentProvider === provider.id &&
+                                            currentModelId === model.id}
                                         on:click={() => addModel(provider.id, model.id)}
                                         on:keydown={() => {}}
                                     >
-                                        <div class="multi-model-selector__add-button">
-                                            <svg class="multi-model-selector__add-icon">
-                                                <use xlink:href="#iconAdd"></use>
-                                            </svg>
-                                        </div>
+                                        {#if enableMultiModel}
+                                            <div class="multi-model-selector__add-button">
+                                                <svg class="multi-model-selector__add-icon">
+                                                    <use xlink:href="#iconAdd"></use>
+                                                </svg>
+                                            </div>
+                                        {/if}
                                         <div class="multi-model-selector__model-info">
-                                            <span class="multi-model-selector__model-name">
-                                                {model.name}
-                                            </span>
+                                            <div class="multi-model-selector__model-name-container">
+                                                {#if enableMultiModel && getModelSelectionCount(provider.id, model.id) > 0}
+                                                    <span 
+                                                        class="multi-model-selector__model-count-badge"
+                                                        role="button"
+                                                        tabindex="0"
+                                                        title="点击减少选择次数"
+                                                        on:click={(e) => decreaseModelSelection(provider.id, model.id, e)}
+                                                        on:keydown={() => {}}
+                                                    >
+                                                        {getModelSelectionCount(provider.id, model.id)}
+                                                    </span>
+                                                {/if}
+                                                <span class="multi-model-selector__model-name">
+                                                    {model.name}
+                                                </span>
+                                            </div>
                                             <span class="multi-model-selector__model-params">
                                                 T: {model.temperature} | Max: {model.maxTokens}
                                             </span>
@@ -968,6 +1062,16 @@
         &:hover {
             background: var(--b3-theme-surface);
         }
+
+        &--active {
+            background: var(--b3-theme-primary-lightest);
+            border-left-color: var(--b3-theme-primary);
+
+            .multi-model-selector__model-name {
+                color: var(--b3-theme-primary);
+                font-weight: 600;
+            }
+        }
     }
 
     .multi-model-selector__add-button {
@@ -998,6 +1102,45 @@
         flex: 1;
         display: flex;
         flex-direction: column;
+    }
+
+    .multi-model-selector__model-name-container {
+        display: flex;
+        align-items: center;
+        position: relative;
+        padding-left: 12px; /* 为角标留出空间 */
+    }
+
+    .multi-model-selector__model-count-badge {
+        position: absolute;
+        left: -8px;
+        top: -8px;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 5px;
+        background: var(--b3-theme-primary);
+        color: white;
+        font-size: 12px;
+        font-weight: 600;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        z-index: 10;
+        border: 2px solid var(--b3-theme-background);
+        cursor: pointer;
+        transition: all 0.2s;
+        user-select: none;
+
+        &:hover {
+            background: var(--b3-theme-primary-light);
+            transform: scale(1.1);
+        }
+
+        &:active {
+            transform: scale(0.95);
+        }
     }
 
     .multi-model-selector__model-name {

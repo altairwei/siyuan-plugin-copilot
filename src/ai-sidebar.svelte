@@ -35,7 +35,6 @@
         removeFile,
     } from './api';
     import { saveAsset, loadAsset, base64ToBlob, readAssetAsText } from './utils/assets';
-    import ModelSelector from './components/ModelSelector.svelte';
     import MultiModelSelector from './components/MultiModelSelector.svelte';
     import SessionManager from './components/SessionManager.svelte';
     import ToolSelector, { type ToolConfig } from './components/ToolSelector.svelte';
@@ -8836,16 +8835,90 @@
                 </button>
             {/if}
 
-            <!-- 多模型对话按钮（仅在问答模式下显示） -->
+            <!-- 模型选择器（问答模式：支持单选/多选切换；其他模式：仅单选） -->
             {#if chatMode === 'ask'}
                 <div class="ai-sidebar__multi-model-selector-wrapper">
+                    {#if !(enableMultiModel) && showThinkingToggle}
+                        <div class="ai-sidebar__thinking-toggle-container">
+                            <button
+                                class="ai-sidebar__thinking-toggle b3-button b3-button--text"
+                                class:ai-sidebar__thinking-toggle--active={isThinkingModeEnabled}
+                                on:click={toggleThinkingMode}
+                                title={isThinkingModeEnabled
+                                    ? t('thinking.enabled')
+                                    : t('thinking.disabled')}
+                                disabled={!currentProvider || !currentModelId}
+                            >
+                                {t('thinking.toggle')}
+                            </button>
+                            {#if showThinkingEffortSelector}
+                                <select
+                                    class="ai-sidebar__thinking-effort-select b3-select"
+                                    value={currentThinkingEffort}
+                                    on:change={handleThinkingEffortChange}
+                                    title={t('thinking.effort.title')}
+                                >
+                                    {#if isCurrentModelGemini}
+                                        <option value="auto">{t('thinking.effort.auto')}</option>
+                                    {/if}
+                                    <option value="low">{t('thinking.effort.low')}</option>
+                                    <option value="medium">{t('thinking.effort.medium')}</option>
+                                    <option value="high">{t('thinking.effort.high')}</option>
+                                </select>
+                            {/if}
+                        </div>
+                    {/if}
                     <MultiModelSelector
                         {providers}
+                        {currentProvider}
+                        {currentModelId}
                         bind:selectedModels={selectedMultiModels}
                         bind:enableMultiModel
+                        on:select={handleModelSelect}
                         on:change={handleMultiModelChange}
                         on:toggleEnable={handleToggleMultiModel}
                         on:toggleThinking={handleToggleModelThinking}
+                    />
+                </div>
+            {:else}
+                <div class="ai-sidebar__model-selector-container">
+                    {#if showThinkingToggle}
+                        <div class="ai-sidebar__thinking-toggle-container">
+                            <button
+                                class="ai-sidebar__thinking-toggle b3-button b3-button--text"
+                                class:ai-sidebar__thinking-toggle--active={isThinkingModeEnabled}
+                                on:click={toggleThinkingMode}
+                                title={isThinkingModeEnabled
+                                    ? t('thinking.enabled')
+                                    : t('thinking.disabled')}
+                                disabled={!currentProvider || !currentModelId}
+                            >
+                                {t('thinking.toggle')}
+                            </button>
+                            {#if showThinkingEffortSelector}
+                                <select
+                                    class="ai-sidebar__thinking-effort-select b3-select"
+                                    value={currentThinkingEffort}
+                                    on:change={handleThinkingEffortChange}
+                                    title={t('thinking.effort.title')}
+                                >
+                                    {#if isCurrentModelGemini}
+                                        <option value="auto">{t('thinking.effort.auto')}</option>
+                                    {/if}
+                                    <option value="low">{t('thinking.effort.low')}</option>
+                                    <option value="medium">{t('thinking.effort.medium')}</option>
+                                    <option value="high">{t('thinking.effort.high')}</option>
+                                </select>
+                            {/if}
+                        </div>
+                    {/if}
+                    <MultiModelSelector
+                        {providers}
+                        {currentProvider}
+                        {currentModelId}
+                        selectedModels={[]}
+                        enableMultiModel={false}
+                        on:select={handleModelSelect}
                     />
                 </div>
             {/if}
@@ -8936,48 +9009,6 @@
                 on:apply={handleApplyModelSettings}
                 {plugin}
             />
-            {#if !(chatMode === 'ask' && enableMultiModel)}
-                <div class="ai-sidebar__model-selector-wrapper">
-                    {#if showThinkingToggle}
-                        <div class="ai-sidebar__thinking-toggle-container">
-                            <button
-                                class="ai-sidebar__thinking-toggle b3-button b3-button--text"
-                                class:ai-sidebar__thinking-toggle--active={isThinkingModeEnabled}
-                                on:click={toggleThinkingMode}
-                                title={isThinkingModeEnabled
-                                    ? t('thinking.enabled')
-                                    : t('thinking.disabled')}
-                                disabled={!currentProvider || !currentModelId}
-                            >
-                                {t('thinking.toggle')}
-                            </button>
-                            {#if showThinkingEffortSelector}
-                                <select
-                                    class="ai-sidebar__thinking-effort-select b3-select"
-                                    value={currentThinkingEffort}
-                                    on:change={handleThinkingEffortChange}
-                                    title={t('thinking.effort.title')}
-                                >
-                                    {#if isCurrentModelGemini}
-                                        <option value="auto">{t('thinking.effort.auto')}</option>
-                                    {/if}
-                                    <option value="low">{t('thinking.effort.low')}</option>
-                                    <option value="medium">{t('thinking.effort.medium')}</option>
-                                    <option value="high">{t('thinking.effort.high')}</option>
-                                </select>
-                            {/if}
-                        </div>
-                    {/if}
-                    <div class="ai-sidebar__model-selector-container">
-                        <ModelSelector
-                            {providers}
-                            {currentProvider}
-                            {currentModelId}
-                            on:select={handleModelSelect}
-                        />
-                    </div>
-                </div>
-            {/if}
         </div>
 
         <!-- 提示词选择器下拉菜单 -->
@@ -10424,6 +10455,9 @@
 
     .ai-sidebar__multi-model-selector-wrapper {
         margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
 
     .ai-sidebar__input-row {
@@ -10565,7 +10599,9 @@
     .ai-sidebar__model-selector-container {
         flex: 1;
         display: flex;
+        align-items: center;
         justify-content: flex-end;
+        gap: 8px;
         /* 保证在 flex 布局中可以缩小，避免在窄宽度下溢出 */
         min-width: 0;
         max-width: 100%;
