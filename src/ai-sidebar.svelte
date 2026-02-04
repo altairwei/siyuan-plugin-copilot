@@ -8838,7 +8838,7 @@
             <!-- 模型选择器（问答模式：支持单选/多选切换；其他模式：仅单选） -->
             {#if chatMode === 'ask'}
                 <div class="ai-sidebar__multi-model-selector-wrapper">
-                    {#if !(enableMultiModel) && showThinkingToggle}
+                    {#if !enableMultiModel && showThinkingToggle}
                         <div class="ai-sidebar__thinking-toggle-container">
                             <button
                                 class="ai-sidebar__thinking-toggle b3-button b3-button--text"
@@ -10078,7 +10078,6 @@
     .ai-message__action {
         flex-shrink: 0;
     }
-
 
     // 三个点跳动动画
     .jumping-dots {

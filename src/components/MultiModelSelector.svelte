@@ -109,7 +109,7 @@
     $: if (isOpen) {
         // 下拉框打开时的展开逻辑
         const query = modelSearchQuery.trim();
-        
+
         if (query) {
             // 有搜索内容时，展开所有匹配的提供商
             const newExpanded = new Set<string>();
@@ -371,9 +371,11 @@
     function decreaseModelSelection(provider: string, modelId: string, event: Event) {
         event.stopPropagation(); // 阻止事件冒泡，避免触发模型选择
         if (!enableMultiModel) return;
-        
+
         // 找到第一个匹配的模型并移除
-        const index = selectedModels.findIndex(m => m.provider === provider && m.modelId === modelId);
+        const index = selectedModels.findIndex(
+            m => m.provider === provider && m.modelId === modelId
+        );
         if (index !== -1) {
             const newModels = [...selectedModels];
             newModels.splice(index, 1);
@@ -396,7 +398,7 @@
         const _provider = currentProvider;
         const _modelId = currentModelId;
         const _width = containerWidth;
-        
+
         const name = getCurrentModelName();
         if (!name || name === t('models.selectPlaceholder')) return name;
         // 如果容器宽度小于 200px，只显示模型名的前10个字符
@@ -526,7 +528,9 @@
         <div class="multi-model-selector__dropdown" bind:this={dropdownEl}>
             <div class="multi-model-selector__header">
                 <div class="multi-model-selector__title">
-                    {enableMultiModel ? t('multiModel.selectModels') : t('models.selectPlaceholder')}
+                    {enableMultiModel
+                        ? t('multiModel.selectModels')
+                        : t('models.selectPlaceholder')}
                 </div>
                 <div
                     class="multi-model-selector__toggle"
@@ -568,112 +572,112 @@
                     </div>
 
                     <div class="multi-model-selector__selected-models">
-                    {#each selectedModels as model, index}
-                        <!-- Drop indicator before this item -->
-                        {#if dropIndicatorIndex === index}
+                        {#each selectedModels as model, index}
+                            <!-- Drop indicator before this item -->
+                            {#if dropIndicatorIndex === index}
+                                <div
+                                    class="multi-model-selector__drop-indicator multi-model-selector__drop-indicator--active"
+                                ></div>
+                            {/if}
+
+                            <div
+                                class="multi-model-selector__selected-model"
+                                draggable="true"
+                                role="button"
+                                tabindex="0"
+                                on:dragstart={e => handleDragStart(e, index)}
+                                on:dragover={e => handleDragOver(e, index)}
+                                on:dragenter={e => handleDragEnter(e, index)}
+                                on:dragleave={handleDragLeave}
+                                on:drop={e => handleDrop(e, index)}
+                                on:dragend={handleDragEnd}
+                            >
+                                <div class="multi-model-selector__selected-model-content">
+                                    <div class="multi-model-selector__drag-handle">
+                                        <svg class="multi-model-selector__drag-icon">
+                                            <use xlink:href="#iconDrag"></use>
+                                        </svg>
+                                    </div>
+                                    <div class="multi-model-selector__selected-model-info">
+                                        <span class="multi-model-selector__selected-model-name">
+                                            {getModelName(model.provider, model.modelId)}
+                                        </span>
+                                        <span class="multi-model-selector__selected-model-provider">
+                                            {getProviderDisplayName(model.provider)}
+                                        </span>
+                                    </div>
+                                    <div
+                                        class="multi-model-selector__selected-model-thinking"
+                                        role="group"
+                                        on:mousedown|stopPropagation
+                                        on:click|stopPropagation
+                                        on:keydown={() => {}}
+                                    >
+                                        {#if getModelCapabilities(model.provider, model.modelId)?.thinking}
+                                            <label
+                                                class="multi-model-selector__thinking-toggle"
+                                                title="思考模式"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    class="b3-switch"
+                                                    checked={getModelThinkingEnabled(
+                                                        model.provider,
+                                                        model.modelId
+                                                    )}
+                                                    on:change={() =>
+                                                        toggleModelThinking(
+                                                            model.provider,
+                                                            model.modelId
+                                                        )}
+                                                />
+                                                <span class="multi-model-selector__thinking-label">
+                                                    思考
+                                                </span>
+                                            </label>
+                                        {/if}
+                                    </div>
+                                    <div class="multi-model-selector__selected-model-actions">
+                                        <button
+                                            class="multi-model-selector__move-btn"
+                                            disabled={index === 0}
+                                            on:click|stopPropagation={() => moveModelUp(index)}
+                                            title={t('multiModel.moveUp')}
+                                        >
+                                            <svg class="multi-model-selector__move-icon">
+                                                <use xlink:href="#iconUp"></use>
+                                            </svg>
+                                        </button>
+                                        <button
+                                            class="multi-model-selector__move-btn"
+                                            disabled={index === selectedModels.length - 1}
+                                            on:click|stopPropagation={() => moveModelDown(index)}
+                                            title={t('multiModel.moveDown')}
+                                        >
+                                            <svg class="multi-model-selector__move-icon">
+                                                <use xlink:href="#iconDown"></use>
+                                            </svg>
+                                        </button>
+                                        <button
+                                            class="multi-model-selector__remove-btn"
+                                            on:click|stopPropagation={() => removeModel(index)}
+                                            title={t('multiModel.remove')}
+                                        >
+                                            <svg class="multi-model-selector__remove-icon">
+                                                <use xlink:href="#iconClose"></use>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        {/each}
+
+                        <!-- Drop indicator after the last item -->
+                        {#if dropIndicatorIndex === selectedModels.length}
                             <div
                                 class="multi-model-selector__drop-indicator multi-model-selector__drop-indicator--active"
                             ></div>
                         {/if}
-
-                        <div
-                            class="multi-model-selector__selected-model"
-                            draggable="true"
-                            role="button"
-                            tabindex="0"
-                            on:dragstart={e => handleDragStart(e, index)}
-                            on:dragover={e => handleDragOver(e, index)}
-                            on:dragenter={e => handleDragEnter(e, index)}
-                            on:dragleave={handleDragLeave}
-                            on:drop={e => handleDrop(e, index)}
-                            on:dragend={handleDragEnd}
-                        >
-                            <div class="multi-model-selector__selected-model-content">
-                                <div class="multi-model-selector__drag-handle">
-                                    <svg class="multi-model-selector__drag-icon">
-                                        <use xlink:href="#iconDrag"></use>
-                                    </svg>
-                                </div>
-                                <div class="multi-model-selector__selected-model-info">
-                                    <span class="multi-model-selector__selected-model-name">
-                                        {getModelName(model.provider, model.modelId)}
-                                    </span>
-                                    <span class="multi-model-selector__selected-model-provider">
-                                        {getProviderDisplayName(model.provider)}
-                                    </span>
-                                </div>
-                                <div
-                                    class="multi-model-selector__selected-model-thinking"
-                                    role="group"
-                                    on:mousedown|stopPropagation
-                                    on:click|stopPropagation
-                                    on:keydown={() => {}}
-                                >
-                                    {#if getModelCapabilities(model.provider, model.modelId)?.thinking}
-                                        <label
-                                            class="multi-model-selector__thinking-toggle"
-                                            title="思考模式"
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                class="b3-switch"
-                                                checked={getModelThinkingEnabled(
-                                                    model.provider,
-                                                    model.modelId
-                                                )}
-                                                on:change={() =>
-                                                    toggleModelThinking(
-                                                        model.provider,
-                                                        model.modelId
-                                                    )}
-                                            />
-                                            <span class="multi-model-selector__thinking-label">
-                                                思考
-                                            </span>
-                                        </label>
-                                    {/if}
-                                </div>
-                                <div class="multi-model-selector__selected-model-actions">
-                                    <button
-                                        class="multi-model-selector__move-btn"
-                                        disabled={index === 0}
-                                        on:click|stopPropagation={() => moveModelUp(index)}
-                                        title={t('multiModel.moveUp')}
-                                    >
-                                        <svg class="multi-model-selector__move-icon">
-                                            <use xlink:href="#iconUp"></use>
-                                        </svg>
-                                    </button>
-                                    <button
-                                        class="multi-model-selector__move-btn"
-                                        disabled={index === selectedModels.length - 1}
-                                        on:click|stopPropagation={() => moveModelDown(index)}
-                                        title={t('multiModel.moveDown')}
-                                    >
-                                        <svg class="multi-model-selector__move-icon">
-                                            <use xlink:href="#iconDown"></use>
-                                        </svg>
-                                    </button>
-                                    <button
-                                        class="multi-model-selector__remove-btn"
-                                        on:click|stopPropagation={() => removeModel(index)}
-                                        title={t('multiModel.remove')}
-                                    >
-                                        <svg class="multi-model-selector__remove-icon">
-                                            <use xlink:href="#iconClose"></use>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    {/each}
-
-                    <!-- Drop indicator after the last item -->
-                    {#if dropIndicatorIndex === selectedModels.length}
-                        <div
-                            class="multi-model-selector__drop-indicator multi-model-selector__drop-indicator--active"
-                        ></div>
-                    {/if}
                     </div>
                 {/if}
             {/if}
@@ -740,15 +744,23 @@
                                         <div class="multi-model-selector__model-info">
                                             <div class="multi-model-selector__model-name-container">
                                                 {#if enableMultiModel && getModelSelectionCount(provider.id, model.id) > 0}
-                                                    <span 
+                                                    <span
                                                         class="multi-model-selector__model-count-badge"
                                                         role="button"
                                                         tabindex="0"
                                                         title="点击减少选择次数"
-                                                        on:click={(e) => decreaseModelSelection(provider.id, model.id, e)}
+                                                        on:click={e =>
+                                                            decreaseModelSelection(
+                                                                provider.id,
+                                                                model.id,
+                                                                e
+                                                            )}
                                                         on:keydown={() => {}}
                                                     >
-                                                        {getModelSelectionCount(provider.id, model.id)}
+                                                        {getModelSelectionCount(
+                                                            provider.id,
+                                                            model.id
+                                                        )}
                                                     </span>
                                                 {/if}
                                                 <span class="multi-model-selector__model-name">
