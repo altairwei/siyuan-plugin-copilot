@@ -405,7 +405,7 @@
             "openai": "OpenAI",
             "volcano": "火山引擎",
             "aapi": "A API",
-            "aapiDescription": "为您提供稳定可靠的Openai ChatGPT、Gemini、Claude、Deepseek、Grok等API直连中转服务"
+            "aapiDescription": "为您提供稳定可靠的Openai ChatGPT、Gemini、Claude、Deepseek、Grok等API直连中转服务，支持nanobanana生图模型。",
         },
         "select": "请选择平台",
         "selectHint": "请选择一个平台以查看或编辑其配置",
