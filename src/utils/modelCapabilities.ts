@@ -51,6 +51,9 @@ function isThinkingModel(modelId: string): boolean {
     // GPT-5 系列
     if (/gpt-5/.test(id)) return true;
 
+    // GPT Codex 系列
+    if (/gpt-.*-codex/.test(id)) return true;
+
     return false;
 }
 
