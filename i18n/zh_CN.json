@@ -499,6 +499,8 @@
         "thinking": "思考",
         "vision": "视觉",
         "imageGeneration": "生图",
+        "toolCalling": "工具调用",
+        "webSearch": "联网搜索",
         "noMatch": "没有找到匹配的模型",
         "fetching": "正在获取模型列表..."
     },

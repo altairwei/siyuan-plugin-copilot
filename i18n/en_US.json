@@ -499,6 +499,8 @@
         "thinking": "Thinking Mode",
         "vision": "Vision",
         "imageGeneration": "Image Gen",
+        "toolCalling": "Tool Calling",
+        "webSearch": "Web Search",
         "noMatch": "No matching models found",
         "fetching": "Fetching model list..."
     },

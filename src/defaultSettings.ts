@@ -11,6 +11,8 @@ export interface ModelConfig {
         thinking?: boolean; // 是否支持思考模式
         vision?: boolean;   // 是否支持视觉
         imageGeneration?: boolean; // 是否支持生图
+        toolCalling?: boolean; // 是否支持工具调用
+        webSearch?: boolean; // 是否支持联网搜索
     };
     thinkingEnabled?: boolean; // 用户是否开启思考模式（仅当支持思考时有效）
     thinkingEffort?: ThinkingEffort; // 思考努力程度（low/medium/high/auto）

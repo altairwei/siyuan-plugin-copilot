@@ -13,7 +13,7 @@
     export let isCustomProvider: boolean = false; // 是否为自定义平台
 
     // 内置平台列表（不需要自定义参数）
-    const builtInProviders = ['Achuan','gemini', 'deepseek', 'openai', 'moonshot', 'volcano'];
+    const builtInProviders = ['Achuan', 'gemini', 'deepseek', 'openai', 'moonshot', 'volcano'];
     $: isBuiltInProvider = builtInProviders.includes(providerId);
 
     const dispatch = createEventDispatcher();
@@ -721,6 +721,41 @@
                                         {t('models.imageGeneration')}
                                     </span>
                                 </label>
+                                <label class="">
+                                    <input
+                                        type="checkbox"
+                                        class="b3-switch"
+                                        checked={model.capabilities?.toolCalling || false}
+                                        on:change={e => {
+                                            if (!model.capabilities) model.capabilities = {};
+                                            model.capabilities.toolCalling =
+                                                e.currentTarget.checked;
+                                            updateModel(
+                                                model.id,
+                                                'capabilities',
+                                                model.capabilities
+                                            );
+                                        }}
+                                    />
+                                    <span class="capability-label">{t('models.toolCalling')}</span>
+                                </label>
+                                <label class="">
+                                    <input
+                                        type="checkbox"
+                                        class="b3-switch"
+                                        checked={model.capabilities?.webSearch || false}
+                                        on:change={e => {
+                                            if (!model.capabilities) model.capabilities = {};
+                                            model.capabilities.webSearch = e.currentTarget.checked;
+                                            updateModel(
+                                                model.id,
+                                                'capabilities',
+                                                model.capabilities
+                                            );
+                                        }}
+                                    />
+                                    <span class="capability-label">{t('models.webSearch')}</span>
+                                </label>
                             </div>
                         </div>
                     </div>
@@ -1023,8 +1058,16 @@
 
     .model-capabilities {
         display: flex;
+        flex-wrap: wrap;
         gap: 8px;
         margin-top: 4px;
+
+        label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
 
         .capability-label {
             font-size: 12px;
