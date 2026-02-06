@@ -31,6 +31,7 @@ function isThinkingModel(modelId: string): boolean {
 
     // Kimi 思考模型
     if (/kimi.*thinking/.test(id)) return true;
+    if (/kimi-k2\.5/.test(id)) return true;
 
     // Gemini 2/3 系列（部分支持）
     if (/gemini-[23]/.test(id)) return true;

@@ -115,6 +115,7 @@ export const getDefaultSettings = () => ({
     // 数据迁移标志
     dataTransfer: {
         sessionData: false,
+        autoSetModelCapabilities: false, // 是否已自动设置模型能力
     },
 
     // 保留旧设置以便兼容升级

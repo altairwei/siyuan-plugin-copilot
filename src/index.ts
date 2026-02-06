@@ -27,6 +27,7 @@ import { setPluginInstance, t } from "./utils/i18n";
 import AISidebar from "./ai-sidebar.svelte";
 import ChatDialog from "./components/ChatDialog.svelte";
 import { updateSettings } from "./stores/settings";
+import { getModelCapabilities } from "./utils/modelCapabilities";
 
 export const SETTINGS_FILE = "settings.json";
 
@@ -290,6 +291,47 @@ export default class PluginSample extends Plugin {
             }
         } catch (e) {
             console.error('Settings migration failed:', e);
+        }
+
+        // 迁移：自动为已有模型设置能力
+        try {
+            // 检查是否已经执行过迁移
+            if (!settings.dataTransfer) {
+                settings.dataTransfer = {};
+            }
+
+            if (settings.dataTransfer.autoSetModelCapabilities) {
+            } else if (settings.aiProviders) {
+                // 内置平台列表
+                const builtInProviders = ['Achuan', 'gemini', 'deepseek', 'openai', 'moonshot', 'volcano'];
+
+                // 处理内置平台
+                for (const providerId of builtInProviders) {
+                    const providerConfig = settings.aiProviders[providerId];
+                    if (providerConfig && Array.isArray(providerConfig.models)) {
+                        for (const model of providerConfig.models) {
+                            model.capabilities = getModelCapabilities(model.id);
+                        }
+                    }
+                }
+
+                // 处理自定义平台
+                if (Array.isArray(settings.aiProviders.customProviders)) {
+                    for (const customProvider of settings.aiProviders.customProviders) {
+                        if (Array.isArray(customProvider.models)) {
+                            for (const model of customProvider.models) {
+                                model.capabilities = getModelCapabilities(model.id);
+                            }
+                        }
+                    }
+                }
+
+                settings.dataTransfer.autoSetModelCapabilities = true;
+                await this.saveData(SETTINGS_FILE, settings);
+                pushMsg('已自动为现有模型设置能力');
+            }
+        } catch (e) {
+            console.error('Auto set model capabilities failed:', e);
         }
 
         const defaultSettings = getDefaultSettings();
