@@ -643,66 +643,6 @@
                                     updateModel(model.id, 'maxTokens', model.maxTokens)}
                             />
                         </div>
-                        <!-- 自定义参数设置（所有平台都显示，默认折叠） -->
-                        <div class="model-config-item">
-                            <button
-                                class="custom-body-toggle"
-                                on:click={() =>
-                                    (showCustomBodyForModel[model.id] =
-                                        !showCustomBodyForModel[model.id])}
-                            >
-                                <svg class="b3-button__icon">
-                                    <use
-                                        xlink:href={showCustomBodyForModel[model.id]
-                                            ? '#iconDown'
-                                            : '#iconRight'}
-                                    ></use>
-                                </svg>
-                                <span>{t('models.customBody')}</span>
-                            </button>
-
-                            {#if showCustomBodyForModel[model.id]}
-                                <div class="custom-body-content">
-                                    <div class="custom-body-header">
-                                        {#if model.customBody && validateJsonString(model.customBody).valid}
-                                            <button
-                                                class="format-json-btn"
-                                                title="格式化 JSON"
-                                                on:click={() =>
-                                                    formatCustomBodyJson(
-                                                        model.id,
-                                                        model.customBody || ''
-                                                    )}
-                                            >
-                                                <svg
-                                                    class="b3-button__icon"
-                                                    style="width: 12px; height: 12px; color: var(--b3-theme-on-surface);"
-                                                >
-                                                    <use xlink:href="#iconFormat"></use>
-                                                </svg>
-                                            </button>
-                                        {/if}
-                                    </div>
-                                    <textarea
-                                        class="b3-text-field custom-body-textarea"
-                                        class:json-error={customBodyErrors[model.id]}
-                                        class:json-valid={model.customBody &&
-                                            !customBodyErrors[model.id] &&
-                                            validateJsonString(model.customBody).valid}
-                                        style="width: 100%; height: 80px; resize: vertical; font-family: monospace; font-size: 12px;"
-                                        value={model.customBody || ''}
-                                        placeholder={'支持嵌套 JSON，例如：\n{\n  "key": "value",\n  "nested": { "a": 1 }\n}'}
-                                        on:input={e =>
-                                            handleCustomBodyChange(model.id, e.currentTarget.value)}
-                                    />
-                                    {#if customBodyErrors[model.id]}
-                                        <div class="json-error-hint">
-                                            {customBodyErrors[model.id]}
-                                        </div>
-                                    {/if}
-                                </div>
-                            {/if}
-                        </div>
                         <div class="model-config-item">
                             <span>{t('models.capabilities')}</span>
                             <div class="model-capabilities">
@@ -798,6 +738,67 @@
                                     <span class="capability-label">🌐 {t('models.webSearch')}</span>
                                 </label>
                             </div>
+                        </div>
+                        <!-- 自定义参数设置（所有平台都显示，默认折叠） -->
+                        <div class="model-config-item">
+                            <button
+                                class="custom-body-toggle"
+                                on:click={() =>
+                                    (showCustomBodyForModel[model.id] =
+                                        !showCustomBodyForModel[model.id])}
+                            >
+                                <svg class="b3-button__icon">
+                                    <use
+                                        xlink:href={showCustomBodyForModel[model.id]
+                                            ? '#iconDown'
+                                            : '#iconRight'}
+                                    ></use>
+                                </svg>
+                                <span>{t('models.customBody')}</span>
+                            </button>
+
+                            {#if showCustomBodyForModel[model.id]}
+                                <div class="custom-body-content">
+                                    <div class="custom-body-header">
+                                        {#if model.customBody && validateJsonString(model.customBody).valid}
+                                            <button
+                                                class="format-json-btn"
+                                                title="格式化 JSON"
+                                                on:click={() =>
+                                                    formatCustomBodyJson(
+                                                        model.id,
+                                                        model.customBody || ''
+                                                    )}
+                                            >
+                                                <svg
+                                                    class="b3-button__icon"
+                                                    style="width: 12px; height: 12px; color: var(--b3-theme-on-surface);"
+                                                >
+                                                    <use xlink:href="#iconFormat"></use>
+                                                </svg>
+                                            </button>
+                                        {/if}
+                                    </div>
+                                    <textarea
+                                        class="b3-text-field custom-body-textarea"
+                                        class:json-error={customBodyErrors[model.id]}
+                                        class:json-valid={model.customBody &&
+                                            !customBodyErrors[model.id] &&
+                                            validateJsonString(model.customBody).valid}
+                                        style="width: 100%; height: 80px; resize: vertical; font-family: monospace; font-size: 12px;"
+                                        value={model.customBody || ''}
+                                        placeholder={'支持嵌套 JSON，例如：\n{\n  "key": "value",\n  "nested": { "a": 1 }\n}'}
+                                        spellcheck={false}
+                                        on:input={e =>
+                                            handleCustomBodyChange(model.id, e.currentTarget.value)}
+                                    />
+                                    {#if customBodyErrors[model.id]}
+                                        <div class="json-error-hint">
+                                            {customBodyErrors[model.id]}
+                                        </div>
+                                    {/if}
+                                </div>
+                            {/if}
                         </div>
                     </div>
                 </div>
