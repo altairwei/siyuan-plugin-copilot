@@ -330,7 +330,7 @@
         newPresetName = preset.name; // 加载预设名称
         tempContextCount = preset.contextCount;
         tempTemperature = preset.temperature;
-        tempTemperatureEnabled = preset.temperatureEnabled ?? true;
+        tempTemperatureEnabled = preset.temperatureEnabled ?? false;
         tempSystemPrompt = preset.systemPrompt;
         tempModelSelectionEnabled = preset.modelSelectionEnabled ?? false;
         tempSelectedModels = [...(preset.selectedModels || [])];
@@ -516,7 +516,7 @@
     async function resetToAppliedSettings() {
         tempContextCount = appliedSettings.contextCount;
         tempTemperature = appliedSettings.temperature;
-        tempTemperatureEnabled = appliedSettings.temperatureEnabled ?? true;
+        tempTemperatureEnabled = appliedSettings.temperatureEnabled ?? false;
         tempSystemPrompt = appliedSettings.systemPrompt;
         tempModelSelectionEnabled = appliedSettings.modelSelectionEnabled ?? false;
         tempSelectedModels = [...(appliedSettings.selectedModels || [])];
@@ -560,7 +560,7 @@
         const modelConfig = getCurrentModelConfig();
         tempContextCount = 10;
         tempTemperature = modelConfig?.temperature ?? 1;
-        tempTemperatureEnabled = true;
+        tempTemperatureEnabled = false;
         tempSystemPrompt = '';
         tempModelSelectionEnabled = false;
         tempSelectedModels = [];
