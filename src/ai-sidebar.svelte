@@ -1853,6 +1853,10 @@
         // 创建新的 AbortController
         abortController = new AbortController();
 
+        // 标记是否已经创建了助手消息（用于多模型第一次返回时保存会话）
+        let assistantMessageCreated = false;
+        let assistantMessageIndex = -1;
+
         // 并发请求所有有效模型
         const promises = validModels.map(async (model, index) => {
             const config = getProviderAndModelConfig(model.provider, model.modelId);
@@ -1933,6 +1937,32 @@
                                     multiModelResponses[index].thinkingCollapsed = true;
                                 }
                                 multiModelResponses = [...multiModelResponses];
+
+                                // 【修复】第一个模型完成时立即保存会话
+                                if (!assistantMessageCreated) {
+                                    assistantMessageCreated = true;
+                                    // 创建包含多模型响应的助手消息
+                                    const assistantMessage: Message = {
+                                        role: 'assistant',
+                                        content: '', // 暂时为空，等用户选择后填充
+                                        multiModelResponses: [...multiModelResponses],
+                                    };
+                                    messages = [...messages, assistantMessage];
+                                    assistantMessageIndex = messages.length - 1;
+                                    hasUnsavedChanges = true;
+
+                                    // 立即保存会话文件
+                                    await saveCurrentSession(true);
+                                } else if (assistantMessageIndex >= 0) {
+                                    // 后续模型完成时更新助手消息的 multiModelResponses
+                                    messages[assistantMessageIndex].multiModelResponses = [
+                                        ...multiModelResponses,
+                                    ];
+                                    messages = [...messages];
+
+                                    // 保存更新后的会话
+                                    await saveCurrentSession(true);
+                                }
                             }
                         },
                         onError: (error: Error) => {
@@ -1941,6 +1971,26 @@
                                 multiModelResponses[index].error = error.message;
                                 multiModelResponses[index].isLoading = false;
                                 multiModelResponses = [...multiModelResponses];
+
+                                // 【修复】模型出错时也保存会话
+                                if (!assistantMessageCreated) {
+                                    assistantMessageCreated = true;
+                                    const assistantMessage: Message = {
+                                        role: 'assistant',
+                                        content: '',
+                                        multiModelResponses: [...multiModelResponses],
+                                    };
+                                    messages = [...messages, assistantMessage];
+                                    assistantMessageIndex = messages.length - 1;
+                                    hasUnsavedChanges = true;
+                                    saveCurrentSession(true);
+                                } else if (assistantMessageIndex >= 0) {
+                                    messages[assistantMessageIndex].multiModelResponses = [
+                                        ...multiModelResponses,
+                                    ];
+                                    messages = [...messages];
+                                    saveCurrentSession(true);
+                                }
                             }
                         },
                     },
@@ -1953,6 +2003,26 @@
                     multiModelResponses[index].error = (error as Error).message;
                     multiModelResponses[index].isLoading = false;
                     multiModelResponses = [...multiModelResponses];
+
+                    // 【修复】catch 块中也保存会话
+                    if (!assistantMessageCreated) {
+                        assistantMessageCreated = true;
+                        const assistantMessage: Message = {
+                            role: 'assistant',
+                            content: '',
+                            multiModelResponses: [...multiModelResponses],
+                        };
+                        messages = [...messages, assistantMessage];
+                        assistantMessageIndex = messages.length - 1;
+                        hasUnsavedChanges = true;
+                        saveCurrentSession(true);
+                    } else if (assistantMessageIndex >= 0) {
+                        messages[assistantMessageIndex].multiModelResponses = [
+                            ...multiModelResponses,
+                        ];
+                        messages = [...messages];
+                        saveCurrentSession(true);
+                    }
                 }
             }
         });
@@ -2355,19 +2425,32 @@
         // 设置布局为页签样式
         multiModelLayout = 'tab';
 
-        // 创建assistant消息，包含多模型完整结果
-        const assistantMessage: Message = {
-            role: 'assistant',
-            content: selectedResponse.content, // 设置为选择的答案内容，以便连续对话时包含上下文
-            thinking: selectedResponse.thinking || '', // 保存思考内容
-            multiModelResponses: multiModelResponses.map((response, i) => ({
+        // 【修复】更新已存在的助手消息，而不是创建新消息
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage && lastMessage.role === 'assistant' && lastMessage.multiModelResponses) {
+            // 更新已有的助手消息
+            lastMessage.content = selectedResponse.content; // 设置为选择的答案内容
+            lastMessage.thinking = selectedResponse.thinking || ''; // 保存思考内容
+            lastMessage.multiModelResponses = multiModelResponses.map((response, i) => ({
                 ...response,
-                isSelected: i === index, // 标记哪个被选择,
+                isSelected: i === index, // 标记哪个被选择
                 modelName: i === index ? ' ✅' + response.modelName : response.modelName, // 选择的模型名添加✅
-            })),
-        };
-
-        messages = [...messages, assistantMessage];
+            }));
+            messages = [...messages];
+        } else {
+            // 如果没有找到助手消息（不应该发生），创建新消息
+            const assistantMessage: Message = {
+                role: 'assistant',
+                content: selectedResponse.content,
+                thinking: selectedResponse.thinking || '',
+                multiModelResponses: multiModelResponses.map((response, i) => ({
+                    ...response,
+                    isSelected: i === index,
+                    modelName: i === index ? ' ✅' + response.modelName : response.modelName,
+                })),
+            };
+            messages = [...messages, assistantMessage];
+        }
 
         // 清除多模型状态
         multiModelResponses = [];
@@ -6207,6 +6290,43 @@
                 }
 
                 messages = [...loadedMessages];
+                
+                // 【修复】检查多模型响应是否缺少选择，自动设置第一个非错误模型为选中
+                for (const msg of messages) {
+                    if (
+                        msg.role === 'assistant' &&
+                        msg.multiModelResponses &&
+                        msg.multiModelResponses.length > 0
+                    ) {
+                        const hasSelected = msg.multiModelResponses.some(r => r.isSelected);
+                        if (!hasSelected) {
+                            // 找到第一个没有错误的响应
+                            const firstSuccessIndex = msg.multiModelResponses.findIndex(
+                                r => !r.error && r.content
+                            );
+                            if (firstSuccessIndex !== -1) {
+                                // 设置第一个成功的模型为选中
+                                msg.multiModelResponses.forEach((response, i) => {
+                                    response.isSelected = i === firstSuccessIndex;
+                                    if (i === firstSuccessIndex) {
+                                        // 更新主 content 为选中的内容
+                                        msg.content = response.content || '';
+                                        msg.thinking = response.thinking || '';
+                                        // 添加 ✅ 标记（如果还没有）
+                                        if (!response.modelName.startsWith('✅')) {
+                                            response.modelName = '✅' + response.modelName;
+                                        }
+                                    }
+                                });
+                                sessionModified = true;
+                                console.log(
+                                    `Auto-selected first successful model (index ${firstSuccessIndex}) for message`
+                                );
+                            }
+                        }
+                    }
+                }
+                
                 // 清空全局上下文文档（上下文现在存储在各个消息中）
                 contextDocuments = [];
                 // 确保系统提示词存在且是最新的
@@ -6221,7 +6341,7 @@
                 currentSessionId = sessionId;
                 hasUnsavedChanges = false;
 
-                // 如果会话被修改（迁移了 base64 图片），自动保存
+                // 如果会话被修改（迁移了 base64 图片或自动选择了模型），自动保存
                 if (sessionModified) {
                     console.log('Session was modified during load, saving...');
                     await saveCurrentSession(true); // 静默保存
@@ -8241,8 +8361,8 @@
                             </div>
                         {/if}
 
-                        <!-- 显示多模型响应（历史消息） -->
-                        {#if message.role === 'assistant' && message.multiModelResponses && message.multiModelResponses.length > 0}
+                        <!-- 显示多模型响应（历史消息） - 仅在用户已选择答案后显示 -->
+                        {#if message.role === 'assistant' && message.multiModelResponses && message.multiModelResponses.length > 0 && message.multiModelResponses.some(r => r.isSelected)}
                             <div class="ai-message__multi-model-responses">
                                 <div class="ai-message__multi-model-header">
                                     <h4>🤖 多模型响应</h4>

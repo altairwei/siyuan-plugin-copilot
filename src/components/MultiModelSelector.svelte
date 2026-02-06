@@ -483,25 +483,25 @@
         // 水平对齐：智能定位，避免超出屏幕边界
         // 先获取弹窗实际宽度
         const dropdownWidth = dropdownEl.offsetWidth || 320;
-        
+
         // 尝试右对齐（弹窗右边缘与按钮右边缘对齐）
         let left = rect.right - dropdownWidth;
-        
+
         // 如果右对齐后超出左边界，则调整为左边界 + margin
         if (left < margin) {
             left = margin;
         }
-        
+
         // 如果仍然超出右边界，则调整为右边界 - dropdownWidth - margin
         if (left + dropdownWidth > window.innerWidth - margin) {
             left = window.innerWidth - dropdownWidth - margin;
         }
-        
+
         // 确保不超出左边界
         if (left < margin) {
             left = margin;
         }
-        
+
         dropdownEl.style.left = `${left}px`;
         dropdownEl.style.right = 'auto';
 
