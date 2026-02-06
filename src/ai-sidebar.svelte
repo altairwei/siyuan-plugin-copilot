@@ -9025,49 +9025,52 @@
                 {/each}
 
                 <!-- 消息操作按钮（组级别，只显示一次） -->
-                <div class="ai-message__actions">
-                    <button
-                        class="b3-button b3-button--text ai-message__action"
-                        on:click={() => copyMessage(getActualMessageContent(firstMessage))}
-                        title={t('aiSidebar.actions.copyMessage')}
-                    >
-                        <svg class="b3-button__icon"><use xlink:href="#iconCopy"></use></svg>
-                    </button>
-                    <button
-                        class="b3-button b3-button--text ai-message__action"
-                        on:click={() => openSaveToNoteDialog(messageIndex)}
-                        title={t('aiSidebar.actions.saveToNote')}
-                    >
-                        <svg class="b3-button__icon"><use xlink:href="#iconDownload"></use></svg>
-                    </button>
-                    <button
-                        class="b3-button b3-button--text ai-message__action"
-                        on:click={() => startEditMessage(messageIndex)}
-                        title={t('aiSidebar.actions.editMessage')}
-                    >
-                        <svg class="b3-button__icon"><use xlink:href="#iconEdit"></use></svg>
-                    </button>
-                    <button
-                        class="b3-button b3-button--text ai-message__action"
-                        on:click={() => deleteMessage(messageIndex)}
-                        title={t('aiSidebar.actions.deleteMessage')}
-                    >
-                        <svg class="b3-button__icon">
-                            <use xlink:href="#iconTrashcan"></use>
-                        </svg>
-                    </button>
-                    <button
-                        class="b3-button b3-button--text ai-message__action"
-                        on:click={() => regenerateMessage(messageIndex)}
-                        title={group.type === 'user'
-                            ? t('aiSidebar.actions.resend')
-                            : t('aiSidebar.actions.regenerate')}
-                    >
-                        <svg class="b3-button__icon">
-                            <use xlink:href="#iconRefresh"></use>
-                        </svg>
-                    </button>
-                </div>
+                <!-- 如果存在多模型响应且未选择答案，则不显示操作按钮 -->
+                {#if !firstMessage.multiModelResponses || (firstMessage.multiModelResponses && firstMessage.multiModelResponses.some(r => r.isSelected))}
+                    <div class="ai-message__actions">
+                        <button
+                            class="b3-button b3-button--text ai-message__action"
+                            on:click={() => copyMessage(getActualMessageContent(firstMessage))}
+                            title={t('aiSidebar.actions.copyMessage')}
+                        >
+                            <svg class="b3-button__icon"><use xlink:href="#iconCopy"></use></svg>
+                        </button>
+                        <button
+                            class="b3-button b3-button--text ai-message__action"
+                            on:click={() => openSaveToNoteDialog(messageIndex)}
+                            title={t('aiSidebar.actions.saveToNote')}
+                        >
+                            <svg class="b3-button__icon"><use xlink:href="#iconDownload"></use></svg>
+                        </button>
+                        <button
+                            class="b3-button b3-button--text ai-message__action"
+                            on:click={() => startEditMessage(messageIndex)}
+                            title={t('aiSidebar.actions.editMessage')}
+                        >
+                            <svg class="b3-button__icon"><use xlink:href="#iconEdit"></use></svg>
+                        </button>
+                        <button
+                            class="b3-button b3-button--text ai-message__action"
+                            on:click={() => deleteMessage(messageIndex)}
+                            title={t('aiSidebar.actions.deleteMessage')}
+                        >
+                            <svg class="b3-button__icon">
+                                <use xlink:href="#iconTrashcan"></use>
+                            </svg>
+                        </button>
+                        <button
+                            class="b3-button b3-button--text ai-message__action"
+                            on:click={() => regenerateMessage(messageIndex)}
+                            title={group.type === 'user'
+                                ? t('aiSidebar.actions.resend')
+                                : t('aiSidebar.actions.regenerate')}
+                        >
+                            <svg class="b3-button__icon">
+                                <use xlink:href="#iconRefresh"></use>
+                            </svg>
+                        </button>
+                    </div>
+                {/if}
             </div>
         {/each}
 
