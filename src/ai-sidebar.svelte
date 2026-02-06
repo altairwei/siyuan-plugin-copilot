@@ -1458,6 +1458,43 @@
         return modelConfig?.capabilities?.thinking ? modelConfig.thinkingEnabled || false : false;
     })();
 
+    // 联网模式状态（响应式）
+    $: isWebSearchModeEnabled = (() => {
+        if (!currentProvider || !currentModelId) {
+            return false;
+        }
+
+        const providerConfig = (() => {
+            const customProvider = settings.aiProviders?.customProviders?.find(
+                (p: any) => p.id === currentProvider
+            );
+            if (customProvider) {
+                return customProvider;
+            }
+
+            if (settings.aiProviders?.[currentProvider]) {
+                return settings.aiProviders[currentProvider];
+            }
+
+            if (providers[currentProvider] && !Array.isArray(providers[currentProvider])) {
+                return providers[currentProvider];
+            }
+
+            if (providers.customProviders && Array.isArray(providers.customProviders)) {
+                return providers.customProviders.find((p: any) => p.id === currentProvider);
+            }
+
+            return null;
+        })();
+
+        if (!providerConfig) {
+            return false;
+        }
+
+        const modelConfig = providerConfig.models?.find((m: any) => m.id === currentModelId);
+        return modelConfig?.capabilities?.webSearch ? modelConfig.webSearchEnabled || false : false;
+    })();
+
     // 是否显示思考模式按钮（只有支持思考的模型才显示）
     $: showThinkingToggle = (() => {
         if (!currentProvider || !currentModelId) {
@@ -1493,6 +1530,48 @@
 
         const modelConfig = providerConfig.models?.find((m: any) => m.id === currentModelId);
         return modelConfig?.capabilities?.thinking || false;
+    })();
+
+    // 是否显示联网模式按钮（只有 Gemini 模型支持联网）
+    $: showWebSearchToggle = (() => {
+        if (!currentProvider || !currentModelId) {
+            return false;
+        }
+
+        // 只有模型名称以 gemini 开头的模型显示联网搜索按钮
+        if (!currentModelId.toLowerCase().startsWith('gemini')) {
+            return false;
+        }
+
+        const providerConfig = (() => {
+            const customProvider = settings.aiProviders?.customProviders?.find(
+                (p: any) => p.id === currentProvider
+            );
+            if (customProvider) {
+                return customProvider;
+            }
+
+            if (settings.aiProviders?.[currentProvider]) {
+                return settings.aiProviders[currentProvider];
+            }
+
+            if (providers[currentProvider] && !Array.isArray(providers[currentProvider])) {
+                return providers[currentProvider];
+            }
+
+            if (providers.customProviders && Array.isArray(providers.customProviders)) {
+                return providers.customProviders.find((p: any) => p.id === currentProvider);
+            }
+
+            return null;
+        })();
+
+        if (!providerConfig) {
+            return false;
+        }
+
+        const modelConfig = providerConfig.models?.find((m: any) => m.id === currentModelId);
+        return modelConfig?.capabilities?.webSearch || false;
     })();
 
     // 是否显示思考程度选择器（只有 Gemini 和 Claude 模型在启用思考模式时才显示）
@@ -1702,6 +1781,81 @@
         await plugin.saveSettings(settings);
     }
 
+    // 切换联网模式
+    async function toggleWebSearchMode() {
+        if (!currentProvider || !currentModelId) {
+            return;
+        }
+
+        const modelConfig = getCurrentModelConfig();
+        if (!modelConfig) {
+            return;
+        }
+
+        // 确保 capabilities 对象存在
+        if (!modelConfig.capabilities) {
+            modelConfig.capabilities = {};
+        }
+
+        // 只有当模型支持联网能力时，才能切换
+        if (!modelConfig.capabilities.webSearch) {
+            return;
+        }
+
+        // 切换联网模式启用状态
+        modelConfig.webSearchEnabled = !modelConfig.webSearchEnabled;
+
+        // 获取提供商配置
+        const providerConfig = getCurrentProviderConfig();
+        if (!providerConfig) {
+            return;
+        }
+
+        // 找到模型在数组中的索引并更新
+        const modelIndex = providerConfig.models.findIndex((m: any) => m.id === currentModelId);
+        if (modelIndex !== -1) {
+            providerConfig.models[modelIndex] = { ...modelConfig };
+            providerConfig.models = [...providerConfig.models];
+        }
+
+        // 更新 settings 并保存
+        const isCustomProvider =
+            settings.aiProviders.customProviders?.some((p: any) => p.id === currentProvider) ||
+            false;
+
+        if (isCustomProvider) {
+            const customProviders = settings.aiProviders.customProviders || [];
+            const customProviderIndex = customProviders.findIndex(
+                (p: any) => p.id === currentProvider
+            );
+            if (customProviderIndex !== -1) {
+                customProviders[customProviderIndex] = { ...providerConfig };
+                settings = {
+                    ...settings,
+                    aiProviders: {
+                        ...settings.aiProviders,
+                        customProviders: [...customProviders],
+                    },
+                };
+            }
+        } else {
+            settings = {
+                ...settings,
+                aiProviders: {
+                    ...settings.aiProviders,
+                    [currentProvider]: providerConfig,
+                },
+            };
+        }
+
+        providers = {
+            ...providers,
+            [currentProvider]: providerConfig,
+        };
+
+        await plugin.saveSettings(settings);
+    }
+
     // 获取指定提供商和模型的配置
     function getProviderAndModelConfig(provider: string, modelId: string) {
         let providerConfig: any = null;
@@ -1896,6 +2050,31 @@
                 let fullText = '';
                 let thinking = '';
 
+                // 准备联网搜索工具（如果启用）
+                let webSearchTools: any[] | undefined = undefined;
+                if (modelConfig.capabilities?.webSearch && modelConfig.webSearchEnabled) {
+                    const modelIdLower = modelConfig.id.toLowerCase();
+
+                    if (modelIdLower.includes('gemini')) {
+                        webSearchTools = [
+                            {
+                                type: 'function',
+                                function: {
+                                    name: 'googleSearch',
+                                },
+                            },
+                        ];
+                    } else if (modelIdLower.includes('claude')) {
+                        webSearchTools = [
+                            {
+                                type: 'web_search_20250305',
+                                name: 'web_search',
+                                max_uses: modelConfig.webSearchMaxUses || 5,
+                            },
+                        ];
+                    }
+                }
+
                 await chat(
                     model.provider,
                     {
@@ -1915,6 +2094,7 @@
                         // 使用模型实例的 thinkingEffort 值，如果没有则使用 modelConfig 中的默认值
                         reasoningEffort:
                             model.thinkingEffort ?? modelConfig.thinkingEffort ?? 'low',
+                        tools: webSearchTools, // 传递联网搜索工具
                         customBody, // 传递自定义参数
                         onThinkingChunk: async (chunk: string) => {
                             thinking += chunk;
@@ -3309,6 +3489,38 @@
                 );
             }
 
+            // 准备联网搜索工具（如果启用）
+            let webSearchTools: any[] | undefined = undefined;
+            if (
+                modelConfig.capabilities?.webSearch &&
+                modelConfig.webSearchEnabled &&
+                chatMode !== 'agent'
+            ) {
+                // 根据模型类型构建不同的联网工具配置
+                const modelIdLower = modelConfig.id.toLowerCase();
+
+                if (modelIdLower.includes('gemini')) {
+                    // Gemini 模型使用 googleSearch 函数
+                    webSearchTools = [
+                        {
+                            type: 'function',
+                            function: {
+                                name: 'googleSearch',
+                            },
+                        },
+                    ];
+                } else if (modelIdLower.includes('claude')) {
+                    // Claude 模型使用 web_search 工具
+                    webSearchTools = [
+                        {
+                            type: 'web_search_20250305',
+                            name: 'web_search',
+                            max_uses: modelConfig.webSearchMaxUses || 5,
+                        },
+                    ];
+                }
+            }
+
             // Agent 模式使用循环调用
             if (chatMode === 'agent' && toolsForAgent && toolsForAgent.length > 0) {
                 let shouldContinue = true;
@@ -3622,6 +3834,7 @@
                         signal: abortController.signal,
                         enableThinking,
                         reasoningEffort: modelConfig.thinkingEffort || 'low',
+                        tools: webSearchTools, // 传递联网搜索工具
                         customBody, // 传递自定义参数
                         enableImageGeneration,
                         onImageGenerated: async (images: any[]) => {
@@ -9618,19 +9831,34 @@
             <!-- 模型选择器（问答模式：支持单选/多选切换；其他模式：仅单选） -->
             {#if chatMode === 'ask'}
                 <div class="ai-sidebar__multi-model-selector-wrapper">
-                    {#if !enableMultiModel && showThinkingToggle}
+                    {#if !enableMultiModel && (showThinkingToggle || showWebSearchToggle)}
                         <div class="ai-sidebar__thinking-toggle-container">
-                            <button
-                                class="ai-sidebar__thinking-toggle b3-button b3-button--text"
-                                class:ai-sidebar__thinking-toggle--active={isThinkingModeEnabled}
-                                on:click={toggleThinkingMode}
-                                title={isThinkingModeEnabled
-                                    ? t('thinking.enabled')
-                                    : t('thinking.disabled')}
-                                disabled={!currentProvider || !currentModelId}
-                            >
-                                {t('thinking.toggle')}
-                            </button>
+                            {#if showThinkingToggle}
+                                <button
+                                    class="ai-sidebar__thinking-toggle b3-button b3-button--text"
+                                    class:ai-sidebar__thinking-toggle--active={isThinkingModeEnabled}
+                                    on:click={toggleThinkingMode}
+                                    title={isThinkingModeEnabled
+                                        ? t('thinking.enabled')
+                                        : t('thinking.disabled')}
+                                    disabled={!currentProvider || !currentModelId}
+                                >
+                                    {t('thinking.toggle')}
+                                </button>
+                            {/if}
+                            {#if showWebSearchToggle}
+                                <button
+                                    class="ai-sidebar__thinking-toggle b3-button b3-button--text"
+                                    class:ai-sidebar__thinking-toggle--active={isWebSearchModeEnabled}
+                                    on:click={toggleWebSearchMode}
+                                    title={isWebSearchModeEnabled
+                                        ? t('webSearch.enabled')
+                                        : t('webSearch.disabled')}
+                                    disabled={!currentProvider || !currentModelId}
+                                >
+                                    🌐
+                                </button>
+                            {/if}
                             {#if showThinkingEffortSelector}
                                 <select
                                     class="ai-sidebar__thinking-effort-select b3-select"
@@ -9667,19 +9895,34 @@
                 </div>
             {:else}
                 <div class="ai-sidebar__model-selector-container">
-                    {#if showThinkingToggle}
+                    {#if showThinkingToggle || showWebSearchToggle}
                         <div class="ai-sidebar__thinking-toggle-container">
-                            <button
-                                class="ai-sidebar__thinking-toggle b3-button b3-button--text"
-                                class:ai-sidebar__thinking-toggle--active={isThinkingModeEnabled}
-                                on:click={toggleThinkingMode}
-                                title={isThinkingModeEnabled
-                                    ? t('thinking.enabled')
-                                    : t('thinking.disabled')}
-                                disabled={!currentProvider || !currentModelId}
-                            >
-                                {t('thinking.toggle')}
-                            </button>
+                            {#if showThinkingToggle}
+                                <button
+                                    class="ai-sidebar__thinking-toggle b3-button b3-button--text"
+                                    class:ai-sidebar__thinking-toggle--active={isThinkingModeEnabled}
+                                    on:click={toggleThinkingMode}
+                                    title={isThinkingModeEnabled
+                                        ? t('thinking.enabled')
+                                        : t('thinking.disabled')}
+                                    disabled={!currentProvider || !currentModelId}
+                                >
+                                    {t('thinking.toggle')}
+                                </button>
+                            {/if}
+                            {#if showWebSearchToggle}
+                                <button
+                                    class="ai-sidebar__thinking-toggle b3-button b3-button--text"
+                                    class:ai-sidebar__thinking-toggle--active={isWebSearchModeEnabled}
+                                    on:click={toggleWebSearchMode}
+                                    title={isWebSearchModeEnabled
+                                        ? t('webSearch.enabled')
+                                        : t('webSearch.disabled')}
+                                    disabled={!currentProvider || !currentModelId}
+                                >
+                                    🌐
+                                </button>
+                            {/if}
                             {#if showThinkingEffortSelector}
                                 <select
                                     class="ai-sidebar__thinking-effort-select b3-select"

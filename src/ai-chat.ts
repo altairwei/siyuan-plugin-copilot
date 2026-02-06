@@ -182,6 +182,14 @@ export function isSupportedThinkingClaudeModel(modelId: string): boolean {
 }
 
 /**
+ * 检测模型是否是 Claude 模型（用于判断是否使用 Claude 原生 API）
+ */
+export function isClaudeModel(modelId: string): boolean {
+    const baseModelId = getLowerBaseModelName(modelId, '/');
+    return CLAUDE_THINKING_MODEL_REGEX.test(baseModelId);
+}
+
+/**
  * 检测模型是否是支持思考模式的 Gemini 模型
  */
 export function isSupportedThinkingGeminiModel(modelId: string): boolean {
@@ -1115,6 +1123,259 @@ async function handleGeminiStreamResponse(
 }
 
 /**
+ * 发送聊天请求 (Claude 原生 API 格式)
+ */
+async function chatClaudeFormat(
+    baseUrl: string,
+    apiKey: string,
+    options: ChatOptions
+): Promise<void> {
+    const url = `${baseUrl}/v1/messages`;
+
+    // 提取 system 消息
+    const systemMessages = options.messages.filter(msg => msg.role === 'system');
+    const systemPrompt = systemMessages.map(msg => 
+        typeof msg.content === 'string' ? msg.content : msg.content.map(c => c.text).join('\n')
+    ).join('\n');
+
+    // 转换消息格式（只保留 user 和 assistant）
+    const formattedMessages = await Promise.all(
+        options.messages
+            .filter(msg => msg.role !== 'system')
+            .map(async msg => {
+                const formatted: any = {
+                    role: msg.role,
+                };
+
+                // 处理多模态内容
+                if (typeof msg.content === 'string') {
+                    formatted.content = msg.content;
+                } else {
+                    // Claude 使用不同的格式
+                    const content: any[] = [];
+                    for (const part of msg.content) {
+                        if (part.type === 'text' && part.text) {
+                            content.push({ type: 'text', text: part.text });
+                        } else if (part.type === 'image_url' && part.image_url) {
+                            // Claude 使用 base64 格式
+                            let base64Data = '';
+                            let mediaType = 'image/jpeg';
+                            
+                            if (part.image_url.url.startsWith('data:')) {
+                                const match = part.image_url.url.match(/^data:(image\/\w+);base64,(.+)$/);
+                                if (match) {
+                                    mediaType = match[1];
+                                    base64Data = match[2];
+                                }
+                            } else if (part.image_url.url.startsWith('blob:')) {
+                                base64Data = await imageUrlToBase64(part.image_url.url);
+                            }
+                            
+                            if (base64Data) {
+                                content.push({
+                                    type: 'image',
+                                    source: {
+                                        type: 'base64',
+                                        media_type: mediaType,
+                                        data: base64Data
+                                    }
+                                });
+                            }
+                        }
+                    }
+                    formatted.content = content;
+                }
+
+                return formatted;
+            })
+    );
+
+    const requestBody: any = {
+        model: options.model,
+        messages: formattedMessages,
+        max_tokens: options.maxTokens || 8192,
+        temperature: options.temperature || 1,
+        stream: options.stream !== false,
+        ...options.customBody // 合并自定义参数
+    };
+
+    // 添加 system 消息
+    if (systemPrompt) {
+        requestBody.system = systemPrompt;
+    }
+
+    // 添加工具定义（包括联网搜索工具）
+    if (options.tools && options.tools.length > 0) {
+        requestBody.tools = options.tools;
+    }
+
+    // 处理思考模式
+    if (options.enableThinking) {
+        const reasoningEffort = options.reasoningEffort || 'low';
+        const budgetTokens = calculateClaudeThinkingBudget(
+            options.model,
+            reasoningEffort,
+            options.maxTokens
+        );
+        requestBody.thinking = {
+            type: 'enabled',
+            budget_tokens: budgetTokens
+        };
+    }
+
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(requestBody),
+            signal: options.signal
+        });
+
+        if (!response.ok) {
+            let errorMessage = `Claude API request failed: ${response.status} ${response.statusText}`;
+            try {
+                const errorData = await response.json();
+                const detailMsg = errorData.error?.message || errorData.message || JSON.stringify(errorData);
+                errorMessage += `\n\n${detailMsg}`;
+            } catch (e) {
+                try {
+                    const errorText = await response.text();
+                    if (errorText) {
+                        errorMessage += `\n\n${errorText}`;
+                    }
+                } catch (textError) {
+                    // 忽略文本读取错误
+                }
+            }
+            throw new Error(errorMessage);
+        }
+
+        if (options.stream !== false && response.body) {
+            await handleClaudeStreamResponse(response.body, options);
+        } else {
+            const data = await response.json();
+            const content = data.content?.[0]?.text || '';
+            options.onChunk?.(content);
+            options.onComplete?.(content);
+        }
+    } catch (error) {
+        if ((error as Error).name === 'AbortError') {
+            console.log('Claude request was aborted by user');
+            options.onError?.(new Error('Request aborted'));
+        } else {
+            console.error('Claude chat error:', error);
+            options.onError?.(error as Error);
+        }
+        throw error;
+    }
+}
+
+/**
+ * 处理 Claude 格式的流式响应
+ */
+async function handleClaudeStreamResponse(
+    body: ReadableStream<Uint8Array>,
+    options: ChatOptions
+): Promise<void> {
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = '';
+    let thinkingText = '';
+    let buffer = '';
+    let isThinkingPhase = false;
+
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+
+                // Claude SSE 格式: event: xxx 或 data: xxx
+                if (trimmed.startsWith('event:')) {
+                    // 事件类型，可以忽略或用于状态管理
+                    continue;
+                }
+
+                if (trimmed.startsWith('data:')) {
+                    const payload = trimmed.slice(5).trimStart();
+                    if (!payload) continue;
+
+                    try {
+                        const json = JSON.parse(payload);
+
+                        // Claude 的流式响应格式
+                        if (json.type === 'content_block_delta') {
+                            const delta = json.delta;
+                            
+                            if (delta?.type === 'text_delta' && delta.text) {
+                                fullText += delta.text;
+                                options.onChunk?.(delta.text);
+                            }
+                            
+                            // 思考内容（如果支持）
+                            if (delta?.type === 'thinking_delta' && delta.thinking) {
+                                isThinkingPhase = true;
+                                thinkingText += delta.thinking;
+                                options.onThinkingChunk?.(delta.thinking);
+                            }
+                        } else if (json.type === 'content_block_start') {
+                            // 内容块开始
+                            if (json.content_block?.type === 'thinking') {
+                                isThinkingPhase = true;
+                            }
+                        } else if (json.type === 'content_block_stop') {
+                            // 内容块结束
+                            if (isThinkingPhase && options.onThinkingComplete) {
+                                options.onThinkingComplete(thinkingText);
+                                isThinkingPhase = false;
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse Claude SSE data:', e);
+                    }
+                }
+            }
+        }
+
+        // 如果结束时还在思考阶段，调用思考完成回调
+        if (isThinkingPhase && options.onThinkingComplete) {
+            options.onThinkingComplete(thinkingText);
+        }
+
+        options.onComplete?.(fullText);
+    } catch (error) {
+        if ((error as Error).name === 'AbortError') {
+            console.log('Claude stream reading was aborted');
+            if (fullText) {
+                options.onComplete?.(fullText);
+            }
+            if (thinkingText && options.onThinkingComplete) {
+                options.onThinkingComplete(thinkingText);
+            }
+        } else {
+            console.error('Claude stream reading error:', error);
+            options.onError?.(error as Error);
+        }
+        throw error;
+    } finally {
+        reader.releaseLock();
+    }
+}
+
+/**
  * 发送聊天请求
  */
 export async function chat(
@@ -1128,24 +1389,31 @@ export async function chat(
 
     let url: string;
     let baseUrlForGemini: string; // Gemini format needs a base url
+    let baseUrlForClaude: string; // Claude format needs a base url
 
     // 优先使用高级自定义的对话 URL
     if (advancedConfig?.customChatUrl) {
         url = advancedConfig.customChatUrl;
-        baseUrlForGemini = advancedConfig.customChatUrl.replace(/\/v1.*$/, ''); // 尝试提取基础URL
+        baseUrlForGemini = advancedConfig.customChatUrl.replace(/\/v1.*$/, '');
+        baseUrlForClaude = advancedConfig.customChatUrl.replace(/\/v1.*$/, '');
     } else if (customApiUrl) {
         const { baseUrl, endpoint } = getBaseUrlAndEndpoint(customApiUrl, config.chatEndpoint);
         url = `${baseUrl}${endpoint}`;
         baseUrlForGemini = baseUrl;
+        baseUrlForClaude = baseUrl;
     } else {
-        if (!isBuiltIn && provider !== 'custom') { // custom provider is a special case of built-in
+        if (!isBuiltIn && provider !== 'custom') {
             throw new Error('Custom provider requires API URL');
         }
         url = `${config.baseUrl}${config.chatEndpoint}`;
         baseUrlForGemini = config.baseUrl;
+        baseUrlForClaude = config.baseUrl;
     }
 
-    if (provider === 'gemini') {
+    // 检测是否是 Claude 模型，使用原生 API
+    if (isClaudeModel(options.model)) {
+        await chatClaudeFormat(baseUrlForClaude, options.apiKey, options);
+    } else if (provider === 'gemini') {
         await chatGeminiFormat(baseUrlForGemini, options.apiKey, options.model, options);
     } else {
         await chatOpenAIFormat(url, options.apiKey, options);

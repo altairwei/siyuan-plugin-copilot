@@ -139,7 +139,7 @@ function isImageGenerationModel(modelId: string): boolean {
     if (/midjourney/.test(id)) return true;
     if (/cogview/.test(id)) return true;
     if (/imagen/.test(id)) return true;
-    
+
     // Gemini 图像生成模型
     if (/gemini.*-image/.test(id)) return true;
     if (/gemini-2\.0-flash-preview-image-generation/.test(id)) return true;
@@ -219,16 +219,9 @@ function isWebSearchModel(modelId: string): boolean {
 
     // OpenAI 部分模型
     if (/gpt-4o/.test(id)) return true;
+    if (/gpt-5/.test(id)) return true;
 
-    // 混元系列（除了 lite）
-    if (/hunyuan/.test(id) && !/lite/.test(id)) return true;
 
-    // GLM-4 系列
-    if (/glm-4-/.test(id)) return true;
-
-    // Qwen 部分模型
-    if (/qwen-(turbo|max|plus|flash)/.test(id)) return true;
-    if (/qwq/.test(id)) return true;
 
     // Grok 系列
     if (/grok/.test(id)) return true;

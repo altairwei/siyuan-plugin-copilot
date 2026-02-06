@@ -611,6 +611,10 @@
             "high": "高"
         }
     },
+    "webSearch": {
+        "enabled": "联网搜索已启用",
+        "disabled": "联网搜索已禁用"
+    },
     "fullscreen": {
         "title": "全屏查看",
         "exit": "退出全屏"

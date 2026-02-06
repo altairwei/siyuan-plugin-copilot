@@ -16,6 +16,8 @@ export interface ModelConfig {
     };
     thinkingEnabled?: boolean; // 用户是否开启思考模式（仅当支持思考时有效）
     thinkingEffort?: ThinkingEffort; // 思考努力程度（low/medium/high/auto）
+    webSearchEnabled?: boolean; // 用户是否开启联网搜索（仅当支持联网时有效）
+    webSearchMaxUses?: number; // 联网搜索最大次数（默认5次）
 };
 
 export interface ProviderConfig {
