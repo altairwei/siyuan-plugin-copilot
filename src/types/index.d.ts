@@ -31,7 +31,7 @@ type NotebookConf = {
     dailyNoteTemplatePath: string;
 }
 
-type BlockType = 
+type BlockType =
     | 'd'
     | 'p'
     | 'query_embed'

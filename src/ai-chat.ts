@@ -19,6 +19,8 @@ export interface MessageAttachment {
     data: string; // base64 或 URL
     mimeType?: string;
     path?: string; // 插件内存储的资源路径
+    isWebPage?: boolean; // 标记是否为网页附件
+    url?: string; // 原始URL（网页附件时使用）
 }
 
 export interface MessageContent {
@@ -1134,7 +1136,7 @@ async function chatClaudeFormat(
 
     // 提取 system 消息
     const systemMessages = options.messages.filter(msg => msg.role === 'system');
-    const systemPrompt = systemMessages.map(msg => 
+    const systemPrompt = systemMessages.map(msg =>
         typeof msg.content === 'string' ? msg.content : msg.content.map(c => c.text).join('\n')
     ).join('\n');
 
@@ -1160,7 +1162,7 @@ async function chatClaudeFormat(
                             // Claude 使用 base64 格式
                             let base64Data = '';
                             let mediaType = 'image/jpeg';
-                            
+
                             if (part.image_url.url.startsWith('data:')) {
                                 const match = part.image_url.url.match(/^data:(image\/\w+);base64,(.+)$/);
                                 if (match) {
@@ -1170,7 +1172,7 @@ async function chatClaudeFormat(
                             } else if (part.image_url.url.startsWith('blob:')) {
                                 base64Data = await imageUrlToBase64(part.image_url.url);
                             }
-                            
+
                             if (base64Data) {
                                 content.push({
                                     type: 'image',
@@ -1319,12 +1321,12 @@ async function handleClaudeStreamResponse(
                         // Claude 的流式响应格式
                         if (json.type === 'content_block_delta') {
                             const delta = json.delta;
-                            
+
                             if (delta?.type === 'text_delta' && delta.text) {
                                 fullText += delta.text;
                                 options.onChunk?.(delta.text);
                             }
-                            
+
                             // 思考内容（如果支持）
                             if (delta?.type === 'thinking_delta' && delta.thinking) {
                                 isThinkingPhase = true;

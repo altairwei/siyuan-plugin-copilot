@@ -371,10 +371,11 @@
                         <p style="margin-top:12px;">我需要的功能我会慢慢改进（打赏可以催更），有些我觉得可以改进、但是现阶段不必要的功能需要打赏才改进（会标注打赏标签和需要打赏金额），而不需要的功能、实现很麻烦的功能会直接关闭issue不考虑实现，我没实现的功能欢迎有大佬来pr</p>
 
                         <p style="margin-top:12px;">累积赞赏50元的朋友如果想加我微信和进粉丝交流群，可以在赞赏的时候备注微信号，或者发邮件到<a href="mailto:achuan-2@outlook.com">achuan-2@outlook.com</a>来进行好友申请</p>
-
+                        
                         <div style="margin-top:12px;">
-                            <img src="plugins/siyuan-plugin-copilot/assets/donate.png" alt="donate" style="max-width:260px; height:auto; border:1px solid var(--b3-border-color);"/>
+                        <img src="plugins/siyuan-plugin-copilot/assets/donate.png" alt="donate" style="max-width:260px; height:auto; border:1px solid var(--b3-border-color);"/>
                         </div>
+                        <p style="margin-top:12px;">也欢迎大家使用我的<a href="https://gpt.achuan-2.top/register?aff=ZndO">AI API中转站</a>，提供Openai ChatGPT、Gemini、Claude、Deepseek、Grok等API直连中转服务，只要用户注册我就有收益</p>
                     `,
                 },
             ],

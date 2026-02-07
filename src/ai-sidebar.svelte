@@ -36,6 +36,7 @@
         removeFile,
     } from './api';
     import { saveAsset, loadAsset, base64ToBlob, readAssetAsText } from './utils/assets';
+    import { parseMultipleWebPages } from './utils/webParser';
     import MultiModelSelector from './components/MultiModelSelector.svelte';
     import SessionManager from './components/SessionManager.svelte';
     import ToolSelector, { type ToolConfig } from './components/ToolSelector.svelte';
@@ -95,6 +96,11 @@
     // 附件管理
     let currentAttachments: MessageAttachment[] = [];
     let isUploadingFile = false;
+
+    // 网页链接功能
+    let isWebLinkDialogOpen = false;
+    let webLinkInput = '';
+    let isFetchingWebContent = false;
 
     // 中断控制
     let abortController: AbortController | null = null;
@@ -761,6 +767,7 @@
         thinkingEnabled?: boolean;
         thinkingEffort?: ThinkingEffort;
     }> = []; // 选中的多个模型
+
     let multiModelResponses: Array<{
         provider: string;
         modelId: string;
@@ -1193,6 +1200,101 @@
     // 移除附件
     function removeAttachment(index: number) {
         currentAttachments = currentAttachments.filter((_, i) => i !== index);
+    }
+
+    // 打开网页链接对话框
+    function openWebLinkDialog() {
+        isWebLinkDialogOpen = true;
+        webLinkInput = '';
+    }
+
+    // 关闭网页链接对话框
+    function closeWebLinkDialog() {
+        isWebLinkDialogOpen = false;
+        webLinkInput = '';
+    }
+
+    // 爬取网页内容并转换为Markdown
+    async function fetchWebPages() {
+        if (!webLinkInput.trim()) {
+            pushErrMsg('请输入至少一个链接');
+            return;
+        }
+
+        // 解析多个链接（按换行符分割）
+        const links = webLinkInput
+            .split('\n')
+            .map(link => link.trim())
+            .filter(link => link.length > 0);
+
+        if (links.length === 0) {
+            pushErrMsg('请输入有效的链接');
+            return;
+        }
+
+        isFetchingWebContent = true;
+        let successCount = 0;
+
+        try {
+            // 使用工具函数批量解析网页
+            const results = await parseMultipleWebPages(links, (current, total, url, success) => {
+                if (success) {
+                    pushMsg(`正在获取 (${current}/${total}): ${url}`);
+                }
+            });
+
+            // 处理解析结果
+            for (const result of results) {
+                if (result.success) {
+                    // 从 URL 中提取文件名
+                    const urlObj = new URL(result.url);
+                    const fileName = `${urlObj.hostname.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.md`;
+
+                    // 保存为 SiYuan 资源
+                    const assetPath = await saveAsset(
+                        new Blob([result.markdown], { type: 'text/markdown' }),
+                        fileName
+                    );
+
+                    // 添加到附件列表，标记为网页类型
+                    currentAttachments = [
+                        ...currentAttachments,
+                        {
+                            type: 'file',
+                            name: result.url,
+                            data: result.markdown,
+                            path: assetPath,
+                            mimeType: 'text/markdown',
+                            isWebPage: true, // 标记为网页附件
+                            url: result.url, // 保存原始URL
+                        },
+                    ];
+
+                    successCount++;
+                    pushMsg(`✓ 成功获取: ${result.title || result.url}`);
+                } else {
+                    // 处理错误
+                    if (
+                        result.error?.includes('CORS') ||
+                        result.error?.includes('Failed to fetch')
+                    ) {
+                        pushErrMsg(`✗ CORS 限制: ${result.url} - 该网站不允许跨域访问`);
+                    } else {
+                        pushErrMsg(`✗ 获取失败: ${result.url} - ${result.error}`);
+                    }
+                }
+            }
+
+            // 如果有成功的结果，关闭弹窗
+            if (successCount > 0) {
+                closeWebLinkDialog();
+            }
+        } catch (error) {
+            console.error('Fetch web pages error:', error);
+            pushErrMsg('获取网页内容失败');
+        } finally {
+            isFetchingWebContent = false;
+        }
     }
 
     // 检查是否在底部
@@ -8978,17 +9080,61 @@
                                                             )}
                                                         title="点击查看大图"
                                                     />
+                                                    <button
+                                                        class="b3-button b3-button--text ai-message__attachment-copy"
+                                                        on:click={() => {
+                                                            navigator.clipboard.writeText(
+                                                                attachment.data
+                                                            );
+                                                            pushMsg('已复制图片URL');
+                                                        }}
+                                                        title="复制图片URL"
+                                                    >
+                                                        <svg class="b3-button__icon">
+                                                            <use xlink:href="#iconCopy"></use>
+                                                        </svg>
+                                                    </button>
                                                     <span class="ai-message__attachment-name">
                                                         {attachment.name}
                                                     </span>
                                                 {:else}
                                                     <div class="ai-message__attachment-file">
-                                                        <svg class="ai-message__attachment-icon">
-                                                            <use xlink:href="#iconFile"></use>
-                                                        </svg>
+                                                        {#if attachment.isWebPage}
+                                                            <span
+                                                                class="ai-message__attachment-icon-emoji"
+                                                            >
+                                                                🔗
+                                                            </span>
+                                                        {:else}
+                                                            <svg
+                                                                class="ai-message__attachment-icon"
+                                                            >
+                                                                <use xlink:href="#iconFile"></use>
+                                                            </svg>
+                                                        {/if}
                                                         <span class="ai-message__attachment-name">
                                                             {attachment.name}
                                                         </span>
+                                                        <button
+                                                            class="b3-button b3-button--text ai-message__attachment-copy"
+                                                            on:click={() => {
+                                                                navigator.clipboard.writeText(
+                                                                    attachment.data
+                                                                );
+                                                                pushMsg(
+                                                                    attachment.isWebPage
+                                                                        ? '已复制网页Markdown内容'
+                                                                        : '已复制文件内容'
+                                                                );
+                                                            }}
+                                                            title={attachment.isWebPage
+                                                                ? '复制网页Markdown'
+                                                                : '复制文件内容'}
+                                                        >
+                                                            <svg class="b3-button__icon">
+                                                                <use xlink:href="#iconCopy"></use>
+                                                            </svg>
+                                                        </button>
                                                     </div>
                                                 {/if}
                                             </div>
@@ -9011,7 +9157,8 @@
                                                 </button>
                                                 <button
                                                     class="b3-button b3-button--text ai-sidebar__context-doc-copy"
-                                                    on:click={() => copyMessage(doc.content || '')}
+                                                    on:click|stopPropagation={() =>
+                                                        copyMessage(doc.content || '')}
                                                     title={t('aiSidebar.actions.copyMessage')}
                                                 >
                                                     <svg class="b3-button__icon">
@@ -9744,7 +9891,7 @@
                         </button>
                         <button
                             class="b3-button b3-button--text ai-sidebar__context-doc-copy"
-                            on:click={() => copyMessage(doc.content || '')}
+                            on:click|stopPropagation={() => copyMessage(doc.content || '')}
                             title={t('aiSidebar.actions.copyMessage')}
                         >
                             <svg class="b3-button__icon"><use xlink:href="#iconCopy"></use></svg>
@@ -9772,6 +9919,35 @@
                             <span class="ai-sidebar__context-doc-name" title={attachment.name}>
                                 🖼️ {attachment.name}
                             </span>
+                            <button
+                                class="b3-button b3-button--text ai-sidebar__context-doc-copy"
+                                on:click|stopPropagation={() => {
+                                    navigator.clipboard.writeText(attachment.data);
+                                    pushMsg('已复制图片URL');
+                                }}
+                                title="复制图片URL"
+                            >
+                                <svg class="b3-button__icon">
+                                    <use xlink:href="#iconCopy"></use>
+                                </svg>
+                            </button>
+                        {:else if attachment.isWebPage}
+                            <span class="ai-sidebar__context-attachment-icon-emoji">🔗</span>
+                            <span class="ai-sidebar__context-doc-name" title={attachment.name}>
+                                {attachment.name}
+                            </span>
+                            <button
+                                class="b3-button b3-button--text ai-sidebar__context-doc-copy"
+                                on:click|stopPropagation={() => {
+                                    navigator.clipboard.writeText(attachment.data);
+                                    pushMsg('已复制网页Markdown内容');
+                                }}
+                                title="复制网页Markdown"
+                            >
+                                <svg class="b3-button__icon">
+                                    <use xlink:href="#iconCopy"></use>
+                                </svg>
+                            </button>
                         {:else}
                             <svg class="ai-sidebar__context-attachment-icon">
                                 <use xlink:href="#iconFile"></use>
@@ -9779,6 +9955,18 @@
                             <span class="ai-sidebar__context-doc-name" title={attachment.name}>
                                 📄 {attachment.name}
                             </span>
+                            <button
+                                class="b3-button b3-button--text ai-sidebar__context-doc-copy"
+                                on:click|stopPropagation={() => {
+                                    navigator.clipboard.writeText(attachment.data);
+                                    pushMsg('已复制文件内容');
+                                }}
+                                title="复制文件内容"
+                            >
+                                <svg class="b3-button__icon">
+                                    <use xlink:href="#iconCopy"></use>
+                                </svg>
+                            </button>
                         {/if}
                     </div>
                 {/each}
@@ -10012,6 +10200,20 @@
                 {/if}
             </button>
             <button
+                class="b3-button b3-button--text ai-sidebar__weblink-btn"
+                on:click={openWebLinkDialog}
+                disabled={isFetchingWebContent || isLoading}
+                title="添加网页链接"
+            >
+                {#if isFetchingWebContent}
+                    <svg class="b3-button__icon ai-sidebar__loading-icon">
+                        <use xlink:href="#iconRefresh"></use>
+                    </svg>
+                {:else}
+                    <svg class="b3-button__icon"><use xlink:href="#iconLink"></use></svg>
+                {/if}
+            </button>
+            <button
                 class="b3-button b3-button--text ai-sidebar__search-btn"
                 on:click={() => {
                     isSearchDialogOpen = !isSearchDialogOpen;
@@ -10140,6 +10342,61 @@
                             </button>
                             <button class="b3-button b3-button--primary" on:click={saveNewPrompt}>
                                 {editingPrompt ? '更新' : '保存'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    <!-- 网页链接对话框 -->
+    {#if isWebLinkDialogOpen}
+        <div class="ai-sidebar__prompt-dialog">
+            <div class="ai-sidebar__prompt-dialog-overlay" on:click={closeWebLinkDialog}></div>
+            <div class="ai-sidebar__prompt-dialog-content">
+                <div class="ai-sidebar__prompt-dialog-header">
+                    <h4>添加网页链接</h4>
+                    <button class="b3-button b3-button--text" on:click={closeWebLinkDialog}>
+                        <svg class="b3-button__icon"><use xlink:href="#iconClose"></use></svg>
+                    </button>
+                </div>
+                <div class="ai-sidebar__prompt-dialog-body">
+                    <div class="ai-sidebar__prompt-form">
+                        <div class="ai-sidebar__prompt-form-field">
+                            <label class="ai-sidebar__prompt-form-label">
+                                网页链接（每行一个）
+                            </label>
+                            <textarea
+                                bind:value={webLinkInput}
+                                placeholder="输入一个或多个网页链接，每行一个&#10;示例：&#10;https://example.com&#10;https://example.org/page"
+                                class="b3-text-field ai-sidebar__prompt-textarea"
+                                rows="10"
+                                disabled={isFetchingWebContent}
+                            ></textarea>
+                            <div
+                                style="margin-top: 8px; font-size: 12px; color: var(--b3-theme-on-surface-light);"
+                            >
+                                💡 提示：
+                                <ul style="margin: 4px 0; padding-left: 20px;">
+                                    <li>由于浏览器安全限制，某些网站可能无法直接访问</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="ai-sidebar__prompt-form-actions">
+                            <button
+                                class="b3-button b3-button--cancel"
+                                on:click={closeWebLinkDialog}
+                                disabled={isFetchingWebContent}
+                            >
+                                取消
+                            </button>
+                            <button
+                                class="b3-button b3-button--primary"
+                                on:click={fetchWebPages}
+                                disabled={isFetchingWebContent || !webLinkInput.trim()}
+                            >
+                                {isFetchingWebContent ? '获取中...' : '获取网页内容'}
                             </button>
                         </div>
                     </div>
@@ -10918,11 +11175,16 @@
         transition: all 0.2s ease;
         cursor: pointer;
         max-width: 100%;
+        position: relative;
 
         &:hover {
             background: var(--b3-theme-surface);
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             transform: translateY(-1px);
+
+            .ai-sidebar__context-doc-copy {
+                opacity: 1;
+            }
         }
     }
 
@@ -10951,17 +11213,21 @@
     }
 
     .ai-sidebar__context-doc-copy {
-        flex-shrink: 0;
-        padding: 2px;
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        padding: 4px;
         border: none;
-        background: none;
+        background: var(--b3-theme-surface);
         cursor: pointer;
-        color: var(--b3-theme-on-surface-light);
+        color: var(--b3-theme-on-surface);
         display: flex;
         align-items: center;
         justify-content: center;
         border-radius: 4px;
         transition: all 0.15s ease;
+        opacity: 0;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 
         .b3-button__icon {
             width: 14px;
@@ -11020,6 +11286,12 @@
         height: 18px;
         color: var(--b3-theme-on-surface-light);
         flex-shrink: 0;
+    }
+
+    .ai-sidebar__context-attachment-icon-emoji {
+        font-size: 18px;
+        flex-shrink: 0;
+        line-height: 1;
     }
 
     .ai-sidebar__messages {
@@ -11556,6 +11828,7 @@
     }
 
     .ai-sidebar__upload-btn,
+    .ai-sidebar__weblink-btn,
     .ai-sidebar__search-btn {
         flex-shrink: 0;
     }
@@ -11666,6 +11939,19 @@
         flex-direction: column;
         gap: 4px;
         max-width: 200px;
+        position: relative;
+
+        &:hover .ai-message__attachment-copy {
+            opacity: 1;
+        }
+
+        // 图片附件的复制按钮位置（在图片右上角）
+        > .ai-message__attachment-copy {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            z-index: 1;
+        }
     }
 
     .ai-message__attachment-image {
@@ -11684,6 +11970,11 @@
         background: var(--b3-theme-surface);
         border: 1px solid var(--b3-border-color);
         border-radius: 6px;
+        position: relative;
+
+        &:hover .ai-message__attachment-copy {
+            opacity: 1;
+        }
     }
 
     .ai-message__attachment-icon {
@@ -11693,12 +11984,36 @@
         flex-shrink: 0;
     }
 
+    .ai-message__attachment-icon-emoji {
+        font-size: 20px;
+        flex-shrink: 0;
+        line-height: 1;
+    }
+
+    .ai-message__attachment-copy {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        padding: 4px;
+        background: var(--b3-theme-background);
+        border-radius: 4px;
+        opacity: 0;
+        transition: all 0.2s;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+
+        &:hover {
+            background: var(--b3-theme-surface);
+        }
+    }
+
     .ai-message__attachment-name {
         font-size: 11px;
         color: var(--b3-theme-on-surface-light);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        flex: 1;
+        min-width: 0;
     }
 
     // 消息上下文文档样式
