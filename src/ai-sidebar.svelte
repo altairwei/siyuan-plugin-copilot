@@ -11631,6 +11631,8 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
         border-bottom: 1px solid var(--b3-border-color);
         flex-shrink: 0;
         min-width: 0; /* 允许在flex布局中缩小 */
+        flex-wrap: wrap; /* 允许换行显示 */
+        gap: 8px; /* 添加间距 */
     }
 
     .ai-sidebar__title {
@@ -11659,7 +11661,6 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
         display: flex;
         align-items: center;
         gap: 4px;
-        flex-shrink: 0; /* 操作按钮不缩小 */
         flex-wrap: wrap; /* 在窄宽度下换行 */
         justify-content: flex-end;
     }
