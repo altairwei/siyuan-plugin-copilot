@@ -64,11 +64,40 @@
 
     // 获取提供商和模型配置
     function getProviderAndModelConfig(provider: string, modelId: string) {
-        const providerConfig = providers.find(p => p.name === provider);
-        if (!providerConfig) return null;
+        // providers 是一个对象，不是数组
+        if (!providers || typeof providers !== 'object') {
+            console.error('providers is not an object:', providers);
+            return null;
+        }
+
+        // 从对象中获取提供商配置
+        const providerConfig = providers[provider];
+        if (!providerConfig) {
+            console.error(
+                'Provider not found:',
+                provider,
+                'Available providers:',
+                Object.keys(providers)
+            );
+            return null;
+        }
+
+        // 确保 models 是数组
+        if (!Array.isArray(providerConfig.models)) {
+            console.error('providerConfig.models is not an array:', providerConfig.models);
+            return null;
+        }
 
         const modelConfig = providerConfig.models.find((m: any) => m.id === modelId);
-        if (!modelConfig) return null;
+        if (!modelConfig) {
+            console.error(
+                'Model not found:',
+                modelId,
+                'Available models:',
+                providerConfig.models.map((m: any) => m.id)
+            );
+            return null;
+        }
 
         return { providerConfig, modelConfig };
     }
