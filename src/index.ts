@@ -54,36 +54,36 @@ export default class PluginSample extends Plugin {
                 console.warn('[WebApp Session] 当前环境不支持 require，无法配置 session，将仅在 webview 层面设置 UA');
                 return;
             }
-            
+
             // 尝试访问 Electron 的 session API
             const { session } = (window as any).require('electron');
             if (!session) {
                 console.warn('[WebApp Session] 无法加载 Electron session 模块');
                 return;
             }
-            
+
             const partitionName = 'persist:siyuan-copilot-webapp-shared';
             const webSession = session.fromPartition(partitionName);
-            
+
             // 获取原始 User-Agent
             const originUA = webSession.getUserAgent();
-            
+
             // 生成清理后的 User-Agent（移除 Electron 等标识）
             let cleanUA = originUA
                 .replace(/Electron\/\S+\s?/gi, '')
                 .replace(/SiYuan\/\S+\s?/gi, '')
                 .replace(/\s+/g, ' ')
                 .trim();
-            
+
             // 如果清理后的 UA 为空或太短，使用标准的 Chrome UA
             if (!cleanUA || cleanUA.length < 50) {
                 cleanUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
             }
-            
-            
+
+
             // 设置默认 User-Agent
             webSession.setUserAgent(cleanUA);
-            
+
             // 拦截请求头，对 Google 使用原始 UA，其他网站使用清理后的 UA
             webSession.webRequest.onBeforeSendHeaders((details: any, callback: any) => {
                 const isGoogle = details.url.includes('google.com') || details.url.includes('googleapis.com') || details.url.includes('gstatic.com');
@@ -94,7 +94,7 @@ export default class PluginSample extends Plugin {
                 };
                 callback({ requestHeaders: headers });
             });
-            
+
         } catch (error) {
             console.warn('[WebApp Session] Session 初始化失败，将仅在 webview 层面设置 UA:', error);
         }
@@ -313,13 +313,13 @@ export default class PluginSample extends Plugin {
                             .replace(/SiYuan\/\S+\s?/gi, '')
                             .replace(/\s+/g, ' ')
                             .trim();
-                        
+
                         // 如果清理后的 UA 为空或太短，使用标准的 Chrome UA
                         if (!cleanUA || cleanUA.length < 50) {
                             cleanUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
                         }
-                        
-                        
+
+
                         return cleanUA;
                     };
 
@@ -338,7 +338,7 @@ export default class PluginSample extends Plugin {
                     // contextIsolation=yes: 启用上下文隔离以提高安全性
                     // webSecurity=yes: 启用 Web 安全策略
                     webview.setAttribute('webpreferences', 'contextIsolation=yes, webSecurity=yes');
-                    
+
                     // 最后设置 src，因为 partition 等属性必须在加载 URL 之前设置
                     webview.src = app.url;
 
