@@ -215,6 +215,13 @@ export default class PluginSample extends Plugin {
                     openInBrowserBtn.innerHTML = '<svg class="b3-button__icon"><use xlink:href="#iconOpenWindow"></use></svg>';
                     navbar.appendChild(openInBrowserBtn);
 
+                    // 复制标签页按钮
+                    const duplicateTabBtn = document.createElement('button');
+                    duplicateTabBtn.className = 'b3-button b3-button--text';
+                    duplicateTabBtn.title = '在新标签页打开';
+                    duplicateTabBtn.innerHTML = '<svg class="b3-button__icon"><use xlink:href="#iconAdd"></use></svg>';
+                    navbar.appendChild(duplicateTabBtn);
+
                     // 全屏按钮
                     const fullscreenBtn = document.createElement('button');
                     fullscreenBtn.className = 'b3-button b3-button--text';
@@ -439,36 +446,82 @@ export default class PluginSample extends Plugin {
                         openInDefaultBrowser();
                     });
 
-                    // 键盘事件处理
-                    const handleKeydown = (e: KeyboardEvent) => {
-                        // Alt+Y 切换全屏
-                        const fullscreenHotkey = getCustomHotKey(window.siyuan.config.keymap.editor.general.fullscreen);
-                        if (matchHotKey(fullscreenHotkey, e)) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            toggleFullscreen();
-                            return;
+                    // 复制标签页按钮点击事件
+                    duplicateTabBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const currentUrl = urlInput.value || app.url;
+                        
+                        // 从URL中提取域名作为初始标题
+                        let initialTitle = 'Web Link';
+                        try {
+                            const urlObj = new URL(currentUrl);
+                            initialTitle = urlObj.hostname || initialTitle;
+                        } catch (err) {
+                            console.warn('Failed to parse URL:', err);
                         }
 
-                        // Esc 退出全屏
-                        if (isFullscreen && e.key === 'Escape') {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (isFullscreen) {
-                                toggleFullscreen();
+                        // 使用当前 Tab 的 icon，如果没有则使用默认 icon
+                        const currentIcon = this.tab?.icon || "iconCopilotWebApp";
+
+                        openTab({
+                            app: pluginInstance.app,
+                            custom: {
+                                icon: currentIcon,
+                                title: initialTitle,
+                                data: {
+                                    app: {
+                                        url: currentUrl,
+                                        name: initialTitle,
+                                        id: "weblink_" + Date.now()
+                                    }
+                                },
+                                id: pluginInstance.name + WEBAPP_TAB_TYPE
                             }
-                        }
-                    };
+                        });
+                    });
 
-                    // 在多个层级添加键盘事件监听，确保能捕获
-                    element.addEventListener('keydown', handleKeydown, true); // 使用 capture 阶段
-                    container.addEventListener('keydown', handleKeydown, true);
-                    document.addEventListener('keydown', handleKeydown, true);
-                    window.addEventListener('keydown', handleKeydown, true);
-
-                    // 监听 console 消息作为通信回退方案
+                    // 监听 console 消息处理 webview 内部的快捷键和链接点击
                     webview.addEventListener('console-message', (e: any) => {
                         const msg = e.message || '';
+                        
+                        // 处理快捷键消息
+                        if (msg.startsWith('__SIYUAN_COPILOT_HOTKEY__:')) {
+                            const key = msg.substring('__SIYUAN_COPILOT_HOTKEY__:'.length);
+                            
+                            if (key === 'alt-left') {
+                                // Alt+← 后退
+                                try {
+                                    if (webview.canGoBack()) {
+                                        redirectCount = 0;
+                                        webview.goBack();
+                                    }
+                                } catch (err) {
+                                    console.warn('后退失败:', err);
+                                }
+                            } else if (key === 'alt-right') {
+                                // Alt+→ 前进
+                                try {
+                                    if (webview.canGoForward()) {
+                                        redirectCount = 0;
+                                        webview.goForward();
+                                    }
+                                } catch (err) {
+                                    console.warn('前进失败:', err);
+                                }
+                            } else if (key === 'alt-y') {
+                                // Alt+Y 切换全屏
+                                toggleFullscreen();
+                            } else if (key === 'escape') {
+                                // Esc 退出全屏
+                                if (isFullscreen) {
+                                    toggleFullscreen();
+                                }
+                            }
+                            return;
+                        }
+                        
+                        // 处理链接打开消息
                         if (msg.startsWith('__SIYUAN_COPILOT_LINK__:')) {
                             const url = msg.substring('__SIYUAN_COPILOT_LINK__:'.length);
                             if (url) {
@@ -517,20 +570,37 @@ export default class PluginSample extends Plugin {
                                     window.__siyuan_copilot_injected = true;
 
                                     document.addEventListener('keydown', function(e) {
-                                        // Alt+Y
-                                        if (e.altKey && e.key.toLowerCase() === 'y') {
+                                        // Alt+← 后退
+                                        if (e.altKey && e.key === 'ArrowLeft') {
                                             e.preventDefault();
-                                            // 通过 postMessage 发送到外部
-                                            window.parent.postMessage({ type: 'webapp-hotkey', key: 'alt-y' }, '*');
+                                            e.stopPropagation();
+                                            console.log('__SIYUAN_COPILOT_HOTKEY__:alt-left');
+                                            return false;
                                         }
-                                        // Esc
+                                        // Alt+→ 前进
+                                        if (e.altKey && e.key === 'ArrowRight') {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            console.log('__SIYUAN_COPILOT_HOTKEY__:alt-right');
+                                            return false;
+                                        }
+                                        // Alt+Y 全屏
+                                        if (e.altKey && (e.key === 'y' || e.key === 'Y')) {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            console.log('__SIYUAN_COPILOT_HOTKEY__:alt-y');
+                                            return false;
+                                        }
+                                        // Esc 退出全屏
                                         if (e.key === 'Escape') {
                                             e.preventDefault();
-                                            window.parent.postMessage({ type: 'webapp-hotkey', key: 'escape' }, '*');
+                                            e.stopPropagation();
+                                            console.log('__SIYUAN_COPILOT_HOTKEY__:escape');
+                                            return false;
                                         }
                                     }, true);
 
-                                    // 监听点击事件，拦截 target="_blank"
+                                    // 监听点击事件，拦截 target="_blank" 和 Ctrl+Click
                                     document.addEventListener('click', function(e) {
                                         var target = e.target;
                                         // 查找最近的 a 标签
@@ -538,11 +608,18 @@ export default class PluginSample extends Plugin {
                                             target = target.parentNode;
                                         }
                                         
-                                        if (target && target.tagName === 'A' && target.getAttribute('target') === '_blank') {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            // 使用 console.log 传递消息，这在 Electron webview 中通常更可靠
-                                            console.log('__SIYUAN_COPILOT_LINK__:' + target.href);
+                                        if (target && target.tagName === 'A') {
+                                            // 处理 target="_blank" 或 Ctrl+Click (Windows/Linux) 或 Cmd+Click (Mac)
+                                            var shouldOpenInNewTab = target.getAttribute('target') === '_blank' || 
+                                                                      e.ctrlKey || 
+                                                                      e.metaKey;
+                                            
+                                            if (shouldOpenInNewTab && target.href) {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                // 使用 console.log 传递消息，这在 Electron webview 中通常更可靠
+                                                console.log('__SIYUAN_COPILOT_LINK__:' + target.href);
+                                            }
                                         }
                                     }, true);
                                 })();
@@ -552,41 +629,13 @@ export default class PluginSample extends Plugin {
                             console.warn('无法注入键盘监听脚本:', err);
                         }
                     });
-
-                    // 监听来自 webview 的消息 (保留作为热键处理的兼容)
-                    const handleMessage = (event: MessageEvent) => {
-                        if (!event.data) return;
-
-                        if (event.data.type === 'webapp-hotkey') {
-                            if (event.data.key === 'alt-y') {
-                                toggleFullscreen();
-                            } else if (event.data.key === 'escape' && isFullscreen) {
-                                toggleFullscreen();
-                            }
-                        }
-                    };
-                    window.addEventListener('message', handleMessage);
-
-                    // 保存清理函数到 element 上，以便在 destroy 时调用
-                    (element as any)._cleanupKeydownHandler = () => {
-                        element.removeEventListener('keydown', handleKeydown, true);
-                        container.removeEventListener('keydown', handleKeydown, true);
-                        document.removeEventListener('keydown', handleKeydown, true);
-                        window.removeEventListener('keydown', handleKeydown, true);
-                        window.removeEventListener('message', handleMessage);
-                    };
                 }
             },
             beforeDestroy() {
                 console.log('before destroy:', this.data);
             },
             destroy() {
-                // 清理键盘事件监听器
-                const element = this.element as any;
-                if (element._cleanupKeydownHandler) {
-                    element._cleanupKeydownHandler();
-                    delete element._cleanupKeydownHandler;
-                }
+                // 清理工作（如果需要）
             }
         });
 
