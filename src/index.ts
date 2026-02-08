@@ -451,7 +451,7 @@ export default class PluginSample extends Plugin {
                         e.preventDefault();
                         e.stopPropagation();
                         const currentUrl = urlInput.value || app.url;
-                        
+
                         // 从URL中提取域名作为初始标题
                         let initialTitle = 'Web Link';
                         try {
@@ -484,11 +484,11 @@ export default class PluginSample extends Plugin {
                     // 监听 console 消息处理 webview 内部的快捷键和链接点击
                     webview.addEventListener('console-message', (e: any) => {
                         const msg = e.message || '';
-                        
+
                         // 处理快捷键消息
                         if (msg.startsWith('__SIYUAN_COPILOT_HOTKEY__:')) {
                             const key = msg.substring('__SIYUAN_COPILOT_HOTKEY__:'.length);
-                            
+
                             if (key === 'alt-left') {
                                 // Alt+← 后退
                                 try {
@@ -520,7 +520,7 @@ export default class PluginSample extends Plugin {
                             }
                             return;
                         }
-                        
+
                         // 处理链接打开消息
                         if (msg.startsWith('__SIYUAN_COPILOT_LINK__:')) {
                             const url = msg.substring('__SIYUAN_COPILOT_LINK__:'.length);
