@@ -443,15 +443,13 @@
         return Date.now().toString(36) + Math.random().toString(36).substr(2);
     }
 
-    // 获取图标 URL（如果是base64直接返回，否则认为是旧的文件名格式）
+    // 获取图标 URL（如果是base64直接返回）
     function getIconUrl(icon: string): string {
         if (!icon) return '';
         // 如果已经是base64格式，直接返回
         if (icon.startsWith('data:')) {
             return icon;
         }
-        // 兼容旧的文件名格式
-        return `/data/storage/petal/siyuan-plugin-copilot/webappIcon/${icon}`;
     }
 
     // 关闭对话框

@@ -11775,7 +11775,7 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
         box-shadow: var(--b3-dialog-shadow);
         min-width: 180px;
         max-width: 250px;
-        max-height: 400px;
+        max-height: 600px;
         overflow-y: auto;
         z-index: 10;
     }
@@ -11784,7 +11784,7 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 8px 12px;
+        padding: 0px 12px;
         width: 100%;
         border: none;
         background: none;

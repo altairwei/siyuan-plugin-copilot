@@ -188,7 +188,7 @@ export default class PluginSample extends Plugin {
                     urlInput.className = 'b3-text-field';
                     urlInput.style.flex = '1';
                     urlInput.style.fontSize = '13px';
-                    
+
                     urlInput.addEventListener('keydown', (e: KeyboardEvent) => {
                         // 阻止冒泡，防止触发全局快捷键
                         e.stopPropagation();
@@ -306,6 +306,13 @@ export default class PluginSample extends Plugin {
                         updateNavigationButtons();
                     });
 
+                    // 监听页面标题更新事件，动态更新标签页标题
+                    webview.addEventListener('page-title-updated', (event: any) => {
+                        const newTitle = event.title;
+                        if (newTitle && this.tab && typeof this.tab.updateTitle === 'function') {
+                            this.tab.updateTitle(newTitle);
+                        }
+                    });
 
                     // 全屏状态标志
                     let isFullscreen = false;
@@ -415,15 +422,27 @@ export default class PluginSample extends Plugin {
                         if (msg.startsWith('__SIYUAN_COPILOT_LINK__:')) {
                             const url = msg.substring('__SIYUAN_COPILOT_LINK__:'.length);
                             if (url) {
+                                // 从URL中提取域名作为初始标题
+                                let initialTitle = 'Web Link';
+                                try {
+                                    const urlObj = new URL(url);
+                                    initialTitle = urlObj.hostname || initialTitle;
+                                } catch (e) {
+                                    console.warn('Failed to parse URL:', e);
+                                }
+
+                                // 使用当前 Tab 的 icon，如果没有则使用默认 icon
+                                const currentIcon = this.tab?.icon || "iconCopilotWebApp";
+
                                 openTab({
                                     app: pluginInstance.app,
                                     custom: {
-                                        icon: "iconCopilotWebApp",
-                                        title: "链接加载中...",
+                                        icon: currentIcon,
+                                        title: initialTitle,
                                         data: {
                                             app: {
                                                 url: url,
-                                                name: "Web Link",
+                                                name: initialTitle,
                                                 id: "weblink_" + Date.now()
                                             }
                                         },
@@ -487,7 +506,7 @@ export default class PluginSample extends Plugin {
                     // 监听来自 webview 的消息 (保留作为热键处理的兼容)
                     const handleMessage = (event: MessageEvent) => {
                         if (!event.data) return;
-                        
+
                         if (event.data.type === 'webapp-hotkey') {
                             if (event.data.key === 'alt-y') {
                                 toggleFullscreen();
