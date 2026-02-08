@@ -236,7 +236,7 @@ export default class PluginSample extends Plugin {
                     webview.style.width = '100%';
                     webview.style.height = '100%';
                     webview.style.border = 'none';
-                    
+
                     // 配置 webview 属性
                     webview.setAttribute('allowpopups', 'true');
                     // 为每个 webapp 设置独立的 partition，确保会话隔离
@@ -312,7 +312,7 @@ export default class PluginSample extends Plugin {
                     // 监听 webview 导航事件
                     webview.addEventListener('did-navigate', (event: any) => {
                         const newUrl = event.url || webview.getURL();
-                        
+
                         // 检测重定向循环
                         if (newUrl === lastUrl) {
                             redirectCount++;
@@ -326,7 +326,7 @@ export default class PluginSample extends Plugin {
                             redirectCount = 0;
                             lastUrl = newUrl;
                         }
-                        
+
                         urlInput.value = newUrl;
                         updateNavigationButtons();
                     });
@@ -346,7 +346,7 @@ export default class PluginSample extends Plugin {
                         redirectCount = 0;
                         updateNavigationButtons();
                     });
-                    
+
                     // 监听加载失败事件
                     webview.addEventListener('did-fail-load', (event: any) => {
                         // errorCode -3 是 ERR_ABORTED，通常是正常的页面跳转，不需要报错
