@@ -767,11 +767,82 @@ export default class PluginSample extends Plugin {
                     }
                 }
             }
+
+            // 监听链接点击事件（仅在启用时）
+            if (settings?.openLinksInWebView) {
+                this.setupLinkClickListener();
+            }
         } catch (e) {
             console.error('Failed to register webapp icons:', e);
         }
+    }
 
+    /**
+     * 设置链接点击监听器
+     * 根据设置决定是否在 webview 中打开外部链接
+     * 直接监听 div.protyle-wysiwyg 下的 span[data-type="a"] 链接点击
+     */
+    private setupLinkClickListener() {
+        // 使用事件委托，监听所有 protyle 编辑器容器
+        document.addEventListener('click', async (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
 
+            // 检查点击的是否为思源链接: span[data-type="a"]
+            if (target.tagName === 'SPAN' && target.getAttribute('data-type') === 'a') {
+                const href = target.getAttribute('data-href');
+
+                // 只处理 https 开头的链接
+                if (href && href.startsWith('https://')) {
+                    // 检查是否在 protyle-wysiwyg 容器内
+                    if (target.closest('.protyle-wysiwyg')) {
+                        // 立即阻止默认行为（必须在异步操作之前）
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.stopImmediatePropagation();
+
+                        const settings = await this.loadSettings();
+
+                        // 如果未启用 webview 打开链接功能，在外部浏览器打开
+                        if (!settings.openLinksInWebView) {
+                            window.open(href, '_blank', 'noopener,noreferrer');
+                            return false;
+                        }
+
+                        console.log('[Link Click] 在 webview 中打开:', href);
+
+                        // 提取链接标题
+                        const linkTitle = target.textContent?.trim() || href;
+
+                        // 在新的 webview 标签页中打开
+                        const appData = {
+                            id: `link-${Date.now()}`,
+                            name: linkTitle.length > 50 ? linkTitle.substring(0, 50) + '...' : linkTitle,
+                            url: href,
+                            createdAt: Date.now(),
+                            updatedAt: Date.now()
+                        };
+
+                        // 存储到待打开列表
+                        this.webApps.set(appData.id, appData);
+
+                        // 打开标签页
+                        openTab({
+                            app: this.app,
+                            custom: {
+                                icon: "iconCopilotWebApp",
+                                title: appData.name,
+                                data: {
+                                    app: appData
+                                },
+                                id: this.name + WEBAPP_TAB_TYPE
+                            }
+                        });
+
+                        return false;
+                    }
+                }
+            }
+        }, true); // 使用捕获阶段，确保能先于其他处理器执行
     }
 
     /**

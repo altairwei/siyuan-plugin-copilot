@@ -9,6 +9,7 @@
             "displayAndOperation": "Display & Operation",
             "noteExport": "Chat Export",
             "sessionManagement": "Session Management",
+            "webApp": "Web App",
             "translate": "Translation Settings",
             "group1": "Tab1",
             "group2": "Tab2",
@@ -137,6 +138,10 @@
             "promptTitle": "Custom Prompt",
             "promptDescription": "Customize the prompt for generating session titles. Use {message} as a placeholder for the user message",
             "promptPlaceholder": "Generate a concise session title (max 20 characters, no quotes) based on the following user message:\n\n{message}"
+        },
+        "openLinksInWebView": {
+            "title": "Open Links in WebView",
+            "description": "When clicking https links in SiYuan notes, open them in built-in WebView tabs instead of external browser"
         },
         "translate": {
             "temperature": {

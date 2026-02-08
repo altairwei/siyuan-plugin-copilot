@@ -195,6 +195,9 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
         updatedAt: number;
     }>,
 
+    // WebApp 相关设置
+    openLinksInWebView: true, // 是否在 webview 中打开外部链接
+
     // 数据迁移标志
     dataTransfer: {
         sessionData: false,

@@ -322,6 +322,20 @@
             ],
         },
         {
+            name: t('settings.settingsGroup.webApp') || '网页小程序',
+            items: [
+                {
+                    key: 'openLinksInWebView',
+                    value: settings.openLinksInWebView,
+                    type: 'checkbox',
+                    title: t('settings.openLinksInWebView.title') || '在 WebView 中打开链接',
+                    description:
+                        t('settings.openLinksInWebView.description') ||
+                        '点击思源笔记中的 https 链接时，在内置 WebView 标签页中打开，而不是外部浏览器',
+                },
+            ],
+        },
+        {
             name: t('settings.settingsGroup.translate') || '翻译设置',
             items: [
                 {

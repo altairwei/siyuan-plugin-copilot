@@ -9,6 +9,7 @@
             "displayAndOperation": "显示与操作",
             "noteExport": "对话导出",
             "sessionManagement": "会话管理",
+            "webApp": "网页小程序",
             "translate": "翻译设置",
             "group1": "页签1",
             "group2": "页签2",
@@ -136,6 +137,10 @@
             "promptTitle": "自定义提示词",
             "promptDescription": "自定义生成会话标题的提示词，使用 {message} 作为用户消息的占位符",
             "promptPlaceholder": "请根据以下用户消息生成一个简洁的会话标题（不超过20个字，不要使用引号）：\n\n{message}"
+        },
+        "openLinksInWebView": {
+            "title": "在 WebView 中打开链接",
+            "description": "点击思源笔记中的 https 链接时，在内置 WebView 标签页中打开，而不是外部浏览器"
         },
         "translate": {
             "temperature": {
