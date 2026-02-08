@@ -144,48 +144,76 @@ export default class PluginSample extends Plugin {
                     container.className = 'fn__flex-1 fn__flex-column';
                     container.style.height = '100%';
                     container.style.width = '100%';
-                    container.style.position = 'relative';
+                    container.style.display = 'flex';
+                    container.style.flexDirection = 'column';
                     container.style.transition = 'all 0.3s ease';
                     container.tabIndex = 0; // 允许容器获取焦点
 
-                    // 创建浮动工具栏
-                    const toolbar = document.createElement('div');
-                    toolbar.style.position = 'absolute';
-                    toolbar.style.top = '8px';
-                    toolbar.style.right = '8px';
-                    toolbar.style.zIndex = '1000';
-                    toolbar.style.display = 'flex';
-                    toolbar.style.gap = '4px';
-                    toolbar.style.padding = '4px';
-                    toolbar.style.background = 'var(--b3-theme-surface)';
-                    toolbar.style.borderRadius = '4px';
-                    toolbar.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-                    toolbar.style.opacity = '0';
-                    toolbar.style.transition = 'opacity 0.2s ease';
+                    // 创建顶部导航栏（类似浏览器）
+                    const navbar = document.createElement('div');
+                    navbar.style.display = 'flex';
+                    navbar.style.alignItems = 'center';
+                    navbar.style.padding = '4px 8px';
+                    navbar.style.gap = '4px';
+                    navbar.style.background = 'var(--b3-theme-surface)';
+                    navbar.style.borderBottom = '1px solid var(--b3-border-color)';
+                    navbar.style.flexShrink = '0';
 
-                    // 全屏按钮
-                    const fullscreenBtn = document.createElement('button');
-                    fullscreenBtn.className = 'b3-button b3-button--text';
-                    fullscreenBtn.title = '全屏 (Alt+Y)';
-                    fullscreenBtn.innerHTML = '<svg class="b3-button__icon"><use xlink:href="#iconFullscreen"></use></svg>';
-                    toolbar.appendChild(fullscreenBtn);
+                    // 后退按钮
+                    const backBtn = document.createElement('button');
+                    backBtn.className = 'b3-button b3-button--text';
+                    backBtn.title = '后退';
+                    backBtn.innerHTML = '<svg class="b3-button__icon"><use xlink:href="#iconLeft"></use></svg>';
+                    backBtn.disabled = true;
+                    navbar.appendChild(backBtn);
+
+                    // 前进按钮
+                    const forwardBtn = document.createElement('button');
+                    forwardBtn.className = 'b3-button b3-button--text';
+                    forwardBtn.title = '前进';
+                    forwardBtn.innerHTML = '<svg class="b3-button__icon"><use xlink:href="#iconRight"></use></svg>';
+                    forwardBtn.disabled = true;
+                    navbar.appendChild(forwardBtn);
+
+                    // 刷新按钮
+                    const refreshBtn = document.createElement('button');
+                    refreshBtn.className = 'b3-button b3-button--text';
+                    refreshBtn.title = '刷新';
+                    refreshBtn.innerHTML = '<svg class="b3-button__icon"><use xlink:href="#iconRefresh"></use></svg>';
+                    navbar.appendChild(refreshBtn);
+
+                    // URL 显示框
+                    const urlInput = document.createElement('input');
+                    urlInput.type = 'text';
+                    urlInput.readOnly = true;
+                    urlInput.value = app.url;
+                    urlInput.className = 'b3-text-field';
+                    urlInput.style.flex = '1';
+                    urlInput.style.fontSize = '13px';
+                    urlInput.style.cursor = 'text';
+                    navbar.appendChild(urlInput);
 
                     // 在默认浏览器打开按钮
                     const openInBrowserBtn = document.createElement('button');
                     openInBrowserBtn.className = 'b3-button b3-button--text';
                     openInBrowserBtn.title = '在默认浏览器打开';
                     openInBrowserBtn.innerHTML = '<svg class="b3-button__icon"><use xlink:href="#iconOpenWindow"></use></svg>';
-                    toolbar.appendChild(openInBrowserBtn);
+                    navbar.appendChild(openInBrowserBtn);
 
-                    container.appendChild(toolbar);
+                    // 全屏按钮
+                    const fullscreenBtn = document.createElement('button');
+                    fullscreenBtn.className = 'b3-button b3-button--text';
+                    fullscreenBtn.title = '全屏 (Alt+Y)';
+                    fullscreenBtn.innerHTML = '<svg class="b3-button__icon"><use xlink:href="#iconFullscreen"></use></svg>';
+                    navbar.appendChild(fullscreenBtn);
 
-                    // 鼠标移入显示工具栏
-                    container.addEventListener('mouseenter', () => {
-                        toolbar.style.opacity = '1';
-                    });
-                    container.addEventListener('mouseleave', () => {
-                        toolbar.style.opacity = '0';
-                    });
+                    container.appendChild(navbar);
+
+                    // 创建 webview 容器包装
+                    const webviewWrapper = document.createElement('div');
+                    webviewWrapper.style.flex = '1';
+                    webviewWrapper.style.position = 'relative';
+                    webviewWrapper.style.overflow = 'hidden';
 
                     // 创建 webview 元素
                     const webview = document.createElement('webview') as any;
@@ -194,8 +222,75 @@ export default class PluginSample extends Plugin {
                     webview.style.height = '100%';
                     webview.style.border = 'none';
 
-                    container.appendChild(webview);
+                    webviewWrapper.appendChild(webview);
+                    container.appendChild(webviewWrapper);
                     element.appendChild(container);
+
+                    // webview 是否已准备好
+                    let webviewReady = false;
+
+                    // 更新导航按钮状态
+                    const updateNavigationButtons = () => {
+                        if (!webviewReady) {
+                            return; // webview 未准备好，跳过更新
+                        }
+                        try {
+                            backBtn.disabled = !webview.canGoBack();
+                            forwardBtn.disabled = !webview.canGoForward();
+                        } catch (err) {
+                            console.warn('更新导航按钮状态失败:', err);
+                        }
+                    };
+
+                    // 后退按钮点击事件
+                    backBtn.addEventListener('click', () => {
+                        try {
+                            if (webview.canGoBack()) {
+                                webview.goBack();
+                            }
+                        } catch (err) {
+                            console.warn('后退失败:', err);
+                        }
+                    });
+
+                    // 前进按钮点击事件
+                    forwardBtn.addEventListener('click', () => {
+                        try {
+                            if (webview.canGoForward()) {
+                                webview.goForward();
+                            }
+                        } catch (err) {
+                            console.warn('前进失败:', err);
+                        }
+                    });
+
+                    // 刷新按钮点击事件
+                    refreshBtn.addEventListener('click', () => {
+                        try {
+                            webview.reload();
+                        } catch (err) {
+                            console.warn('刷新失败:', err);
+                        }
+                    });
+
+                    // 监听 webview 导航事件
+                    webview.addEventListener('did-navigate', (event: any) => {
+                        urlInput.value = event.url || webview.getURL();
+                        updateNavigationButtons();
+                    });
+
+                    webview.addEventListener('did-navigate-in-page', (event: any) => {
+                        urlInput.value = event.url || webview.getURL();
+                        updateNavigationButtons();
+                    });
+
+                    webview.addEventListener('did-start-loading', () => {
+                        updateNavigationButtons();
+                    });
+
+                    webview.addEventListener('did-stop-loading', () => {
+                        updateNavigationButtons();
+                    });
 
                     // 全屏状态标志
                     let isFullscreen = false;
@@ -217,16 +312,15 @@ export default class PluginSample extends Plugin {
                             container.style.background = 'var(--b3-theme-background)';
                             fullscreenBtn.innerHTML = '<svg class="b3-button__icon"><use xlink:href="#iconContract"></use></svg>';
                             fullscreenBtn.title = '退出全屏 (Esc 或 Alt+Y)';
-                            toolbar.style.opacity = '1'; // 全屏时始终显示工具栏
                         } else {
                             // 退出全屏
-                            container.style.position = 'relative';
+                            container.style.position = '';
                             container.style.top = '';
                             container.style.left = '';
                             container.style.right = '';
                             container.style.bottom = '';
-                            container.style.width = '100%';
-                            container.style.height = '100%';
+                            container.style.width = '';
+                            container.style.height = '';
                             container.style.zIndex = '';
                             container.style.background = '';
                             fullscreenBtn.innerHTML = '<svg class="b3-button__icon"><use xlink:href="#iconFullscreen"></use></svg>';
@@ -244,24 +338,26 @@ export default class PluginSample extends Plugin {
                     // 在默认浏览器中打开按钮点击事件
                     const openInDefaultBrowser = () => {
                         try {
+                            const currentUrl = urlInput.value || app.url;
                             // 尝试通过后端接口打开（如果可用）
                             const backend = typeof getBackend === 'function' ? (getBackend() as any) : null;
                             if (backend && typeof backend.openExternal === 'function') {
-                                backend.openExternal(app.url);
+                                backend.openExternal(currentUrl);
                                 return;
                             }
 
                             // 尝试使用 window.siyuan 提供的方法（不同环境可能暴露不同接口）
                             if ((window as any).siyuan && typeof (window as any).siyuan.openExternal === 'function') {
-                                (window as any).siyuan.openExternal(app.url);
+                                (window as any).siyuan.openExternal(currentUrl);
                                 return;
                             }
 
                             // 回退到 window.open
-                            window.open(app.url, '_blank', 'noopener');
+                            window.open(currentUrl, '_blank', 'noopener');
                         } catch (err) {
                             console.warn('打开外部链接失败，使用 window.open 回退：', err);
-                            window.open(app.url, '_blank', 'noopener');
+                            const currentUrl = urlInput.value || app.url;
+                            window.open(currentUrl, '_blank', 'noopener');
                         }
                     };
 
@@ -300,6 +396,9 @@ export default class PluginSample extends Plugin {
 
                     // 尝试在 webview 加载完成后注入键盘监听
                     webview.addEventListener('dom-ready', () => {
+                        webviewReady = true; // 标记 webview 已准备好
+                        updateNavigationButtons(); // 初始化导航按钮状态
+
                         try {
                             // 注入脚本来监听 webview 内部的键盘事件
                             const script = `
