@@ -694,6 +694,61 @@ export default class PluginSample extends Plugin {
                     webviewWrapper.style.position = 'relative';
                     webviewWrapper.style.overflow = 'hidden';
 
+                    // ----------------- 搜索栏开始 -----------------
+                    const searchBar = document.createElement('div');
+                    searchBar.style.position = 'absolute';
+                    searchBar.style.top = '0';
+                    searchBar.style.right = '20px';
+                    searchBar.style.background = 'var(--b3-theme-surface)';
+                    searchBar.style.border = '1px solid var(--b3-border-color)';
+                    searchBar.style.borderTop = 'none';
+                    searchBar.style.borderRadius = '0 0 4px 4px';
+                    searchBar.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                    searchBar.style.zIndex = '100';
+                    searchBar.style.display = 'none'; 
+                    searchBar.style.alignItems = 'center';
+                    searchBar.style.padding = '4px 8px';
+                    searchBar.style.gap = '4px';
+
+                    const searchInput = document.createElement('input');
+                    searchInput.className = 'b3-text-field';
+                    searchInput.placeholder = '查找...';
+                    searchInput.style.fontSize = '12px';
+                    searchInput.style.padding = '2px 4px';
+                    searchInput.style.width = '160px';
+                    searchInput.style.height = '24px';
+                    
+                    const searchCount = document.createElement('span');
+                    searchCount.style.fontSize = '12px';
+                    searchCount.style.color = 'var(--b3-theme-on-surface-light)';
+                    searchCount.style.minWidth = '40px';
+                    searchCount.style.textAlign = 'center';
+                    searchCount.innerText = '0/0';
+
+                    const createSearchBtn = (iconId: string, title: string) => {
+                        const btn = document.createElement('button');
+                        btn.className = 'b3-button b3-button--text';
+                        btn.style.width = '24px';
+                        btn.style.height = '24px';
+                        btn.style.padding = '4px';
+                        btn.title = title;
+                        btn.innerHTML = `<svg class="b3-button__icon" style="width:14px;height:14px;"><use xlink:href="#${iconId}"></use></svg>`;
+                        return btn;
+                    };
+
+                    const prevBtn = createSearchBtn('iconUp', '上一个');
+                    const nextBtn = createSearchBtn('iconDown', '下一个');
+                    const closeSearchBtn = createSearchBtn('iconClose', '关闭');
+
+                    searchBar.appendChild(searchInput);
+                    searchBar.appendChild(searchCount);
+                    searchBar.appendChild(prevBtn);
+                    searchBar.appendChild(nextBtn);
+                    searchBar.appendChild(closeSearchBtn);
+                    
+                    webviewWrapper.appendChild(searchBar);
+                    // ----------------- 搜索栏结束 -----------------
+
                     // 创建 webview 元素
                     const webview = document.createElement('webview') as any;
                     webview.style.width = '100%';
@@ -897,6 +952,69 @@ export default class PluginSample extends Plugin {
                             });
                         }
                     };
+
+                    // ----------------- 搜索功能逻辑 -----------------
+                    const performSearch = (forward = true, findNext = false) => {
+                        const query = searchInput.value;
+                        if (!query) {
+                            webview.stopFindInPage('clearSelection');
+                            searchCount.innerText = '0/0';
+                            return;
+                        }
+                        webview.findInPage(query, { forward, findNext });
+                    };
+
+                    const showSearchBar = () => {
+                        searchBar.style.display = 'flex';
+                        searchInput.focus();
+                        searchInput.select();
+                        // 延迟一下再搜索，确保 UI 渲染完成
+                        setTimeout(() => {
+                           if (searchInput.value) {
+                               performSearch(true, false);
+                           }
+                        }, 50);
+                    };
+
+                    const hideSearchBar = () => {
+                        searchBar.style.display = 'none';
+                        webview.stopFindInPage('clearSelection');
+                        webview.focus();
+                    };
+
+                    searchInput.addEventListener('input', () => {
+                        performSearch(true, false);
+                    });
+
+                    searchInput.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            performSearch(!e.shiftKey, true);
+                        } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            hideSearchBar();
+                        }
+                    });
+
+                    prevBtn.addEventListener('click', () => performSearch(false, true));
+                    nextBtn.addEventListener('click', () => performSearch(true, true));
+                    closeSearchBtn.addEventListener('click', hideSearchBar);
+
+                    webview.addEventListener('found-in-page', (e: any) => {
+                        if (e.result) {
+                            searchCount.innerText = `${e.result.activeMatchOrdinal}/${e.result.matches}`;
+                        }
+                    });
+
+                    // 绑定容器的 Ctrl+F (当焦点在 webview 外部时)
+                    container.addEventListener('keydown', (e: KeyboardEvent) => {
+                         if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+                             e.preventDefault();
+                             e.stopPropagation();
+                             showSearchBar();
+                         }
+                    });
+                    // ----------------- 搜索功能逻辑结束 -----------------
 
                     // 监听 webview 导航事件
                     webview.addEventListener('did-navigate', (event: any) => {
@@ -1133,9 +1251,14 @@ export default class PluginSample extends Plugin {
                             } else if (key === 'alt-y') {
                                 // Alt+Y 切换全屏
                                 toggleFullscreen();
+                            } else if (key === 'ctrl-f') {
+                                // Ctrl+F 搜索
+                                showSearchBar();
                             } else if (key === 'escape') {
-                                // Esc 退出全屏
-                                if (isFullscreen) {
+                                // Esc 退出全屏 或 关闭搜索
+                                if (searchBar.style.display !== 'none') {
+                                    hideSearchBar();
+                                } else if (isFullscreen) {
                                     toggleFullscreen();
                                 }
                             }
@@ -1156,9 +1279,9 @@ export default class PluginSample extends Plugin {
                         try {
                             const script = `
                                 (function() {
-                                    // 注入一次即可，防止重复 (使用新标记 v2 避免缓存问题)
-                                    if (window.__siyuan_copilot_injected_v2) return;
-                                    window.__siyuan_copilot_injected_v2 = true;
+                                    // 注入一次即可，防止重复 (使用新标记 v3 避免缓存问题)
+                                    if (window.__siyuan_copilot_injected_v3) return;
+                                    window.__siyuan_copilot_injected_v3 = true;
 
                                     // 键盘事件监听
                                     document.addEventListener('keydown', function(e) {
@@ -1183,11 +1306,18 @@ export default class PluginSample extends Plugin {
                                             console.log('__SIYUAN_COPILOT_HOTKEY__:alt-y');
                                             return false;
                                         }
-                                        // Esc 退出全屏
+                                        // Esc 退出全屏 或 关闭搜索
                                         if (e.key === 'Escape') {
                                             e.preventDefault();
                                             e.stopPropagation();
                                             console.log('__SIYUAN_COPILOT_HOTKEY__:escape');
+                                            return false;
+                                        }
+                                        // Ctrl+F OR Cmd+F 搜索
+                                        if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            console.log('__SIYUAN_COPILOT_HOTKEY__:ctrl-f');
                                             return false;
                                         }
                                     }, true);
