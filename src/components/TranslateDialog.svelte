@@ -198,14 +198,13 @@
         await plugin.saveData('settings.json', settings);
     }
 
-    // 交换语言
+    // 交换语言（仅交换语言，不交换文本）
     async function swapLanguages() {
         if (translateInputLanguage !== 'auto') {
-            [translateInputLanguage, translateOutputLanguage] = [
-                translateOutputLanguage,
-                translateInputLanguage,
-            ];
-            [translateInputText, translateOutputText] = [translateOutputText, translateInputText];
+            const prevInputLanguage = translateInputLanguage;
+            translateInputLanguage = translateOutputLanguage;
+            translateOutputLanguage = prevInputLanguage;
+            // 保持输入/输出文本不变
             await saveTranslateLanguageSettings();
         }
     }
