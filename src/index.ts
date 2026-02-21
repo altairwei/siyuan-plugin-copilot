@@ -1824,7 +1824,7 @@ export default class PluginSample extends Plugin {
         this.chatDialogs.set(dialogId, { dialog, app: chatApp });
     }
 
-    async onunload() {
+    onunload() {
         //当插件被禁用的时候，会自动调用这个函数
         console.log("Copilot onunload");
     }
