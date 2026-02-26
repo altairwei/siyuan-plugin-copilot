@@ -1719,8 +1719,8 @@ export async function siyuan_set_block_attrs(id: string, attrs: { [key: string]:
  * 从设置中读取 API Key 和代理配置
  */
 export function getBraveSearchConfig(): BraveSearchConfig {
-    // 尝试从 storage 获取设置
-    const settings = window.siyuan?.storage?.['siyuan-plugin-copilot'] || {};
+    // 从 window 上的全局变量获取设置（由 ai-sidebar.svelte 设置）
+    const settings = (window as any).__siyuanCopilotSettings || {};
     const apiKey = settings?.braveSearchApiKey || '';
     const baseUrl = settings?.braveSearchBaseUrl || '';
     const httpProxy = settings?.braveSearchHttpProxy || '';

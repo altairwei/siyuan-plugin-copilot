@@ -1291,6 +1291,9 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
 
     onMount(async () => {
         settings = await plugin.loadSettings();
+        
+        // 将设置保存到 window 以便工具函数访问
+        (window as any).__siyuanCopilotSettings = settings;
 
         // 迁移旧设置到新结构
         migrateOldSettings();
