@@ -2650,27 +2650,15 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                 let thinking = '';
 
                 // 准备联网搜索工具（如果启用）
+                // 在所有模式下（ask/edit/agent）都启用 web_search，只要用户开启了 webSearchEnabled
                 let webSearchTools: any[] | undefined = undefined;
                 if (modelConfig.capabilities?.webSearch && modelConfig.webSearchEnabled) {
-                    const modelIdLower = modelConfig.id.toLowerCase();
-
-                    if (modelIdLower.includes('gemini')) {
-                        webSearchTools = [
-                            {
-                                type: 'function',
-                                function: {
-                                    name: 'googleSearch',
-                                },
-                            },
-                        ];
-                    } else if (modelIdLower.includes('claude')) {
-                        // webSearchTools = [
-                        //     {
-                        //         type: 'web_search_20250305',
-                        //         name: 'web_search',
-                        //         max_uses: modelConfig.webSearchMaxUses || 5,
-                        //     },
-                        // ];
+                    // 找到 web_search 工具定义
+                    const webSearchTool = AVAILABLE_TOOLS.find(
+                        tool => tool.function.name === 'web_search'
+                    );
+                    if (webSearchTool) {
+                        webSearchTools = [webSearchTool];
                     }
                 }
 
@@ -4089,34 +4077,15 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
             }
 
             // 准备联网搜索工具（如果启用）
+            // 在所有模式下（ask/edit/agent）都启用 web_search，只要用户开启了 webSearchEnabled
             let webSearchTools: any[] | undefined = undefined;
-            if (
-                modelConfig.capabilities?.webSearch &&
-                modelConfig.webSearchEnabled &&
-                chatMode !== 'agent'
-            ) {
-                // 根据模型类型构建不同的联网工具配置
-                const modelIdLower = modelConfig.id.toLowerCase();
-
-                if (modelIdLower.includes('gemini')) {
-                    // Gemini 模型使用 googleSearch 函数
-                    webSearchTools = [
-                        {
-                            type: 'function',
-                            function: {
-                                name: 'googleSearch',
-                            },
-                        },
-                    ];
-                } else if (modelIdLower.includes('claude')) {
-                    // Claude 模型使用 web_search 工具
-                    // webSearchTools = [
-                    //     {
-                    //         type: 'web_search_20250305',
-                    //         name: 'web_search',
-                    //         max_uses: modelConfig.webSearchMaxUses || 5,
-                    //     },
-                    // ];
+            if (modelConfig.capabilities?.webSearch && modelConfig.webSearchEnabled) {
+                // 找到 web_search 工具定义
+                const webSearchTool = AVAILABLE_TOOLS.find(
+                    tool => tool.function.name === 'web_search'
+                );
+                if (webSearchTool) {
+                    webSearchTools = [webSearchTool];
                 }
             }
 
