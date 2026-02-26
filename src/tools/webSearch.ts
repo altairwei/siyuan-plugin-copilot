@@ -107,19 +107,30 @@ export async function webSearch(
     }
 
     try {
-        // 浏览器环境下的代理说明：
-        // 1. 系统代理：浏览器会自动使用系统的代理设置
-        // 2. 插件配置：可以在设置中记录代理地址（供未来后端转发服务使用）
-        // 注意：直接使用 fetch 无法设置 SOCKS5 代理
-        
-        const response = await fetch(url.toString(), {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'Accept-Encoding': 'gzip',
-                'X-Subscription-Token': config.apiKey
+        let response;
+        try {
+            response = await fetch(url.toString(), {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Accept-Encoding': 'gzip',
+                    'X-Subscription-Token': config.apiKey
+                }
+            });
+        } catch (fetchError) {
+            // 网络错误（连接失败、超时等）
+            const errorMsg = (fetchError as Error).message;
+            let hint = '';
+            if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError')) {
+                hint = '\n\n提示：无法连接到 Brave Search 服务器。请检查：\n1. 是否有网络连接\n2. 是否需要代理才能访问外网\n3. 代理是否已启用';
             }
-        });
+            return {
+                type: 'web_search',
+                query,
+                results: [],
+                error: `网络请求失败: ${errorMsg}${hint}`
+            };
+        }
 
         if (!response.ok) {
             const errorText = await response.text();
