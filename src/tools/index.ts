@@ -1716,16 +1716,21 @@ export async function siyuan_set_block_attrs(id: string, attrs: { [key: string]:
 
 /**
  * 获取 Brave Search API 配置
- * 从设置中读取 API Key
+ * 从设置中读取 API Key 和代理配置
  */
 export function getBraveSearchConfig(): BraveSearchConfig {
-    const settings = window.siyuan?.storage?.['siyuan-plugin-copilot'];
+    // 尝试从 storage 获取设置
+    const settings = window.siyuan?.storage?.['siyuan-plugin-copilot'] || {};
     const apiKey = settings?.braveSearchApiKey || '';
-    const baseUrl = settings?.braveSearchBaseUrl || undefined;
+    const baseUrl = settings?.braveSearchBaseUrl || '';
+    const httpProxy = settings?.braveSearchHttpProxy || '';
+    const socksProxy = settings?.braveSearchSocksProxy || '';
     
     return {
         apiKey,
-        baseUrl
+        baseUrl: baseUrl || undefined,
+        httpProxy: httpProxy || undefined,
+        socksProxy: socksProxy || undefined
     };
 }
 
