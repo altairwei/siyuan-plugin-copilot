@@ -44,6 +44,12 @@
                 'siyuan_move_documents',
             ],
         },
+        web: {
+            name: t('tools.category.web') || '网络工具',
+            tools: [
+                'web_search',
+            ],
+        },
     };
 
     // 按类别组织工具
