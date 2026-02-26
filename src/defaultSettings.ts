@@ -200,6 +200,10 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
     // WebApp 相关设置
     openLinksInWebView: false, // 是否在 webview 中打开外部链接
 
+    // Web Search 设置
+    braveSearchApiKey: '' as string, // Brave Search API Key
+    braveSearchBaseUrl: '' as string, // Brave Search API 基础 URL（可选，使用默认值）
+
     // 数据迁移标志
     dataTransfer: {
         sessionData: false,

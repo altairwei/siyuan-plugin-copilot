@@ -37,6 +37,7 @@ import {
     removeAttributeViewBlocks,
 } from '../api';
 import { getActiveEditor } from 'siyuan';
+import { webSearch, formatSearchResults, WebSearchResponse } from './webSearch';
 
 /**
  * 获取当前激活的编辑器 Protyle 实例
@@ -88,6 +89,91 @@ export interface ToolResult {
 // ==================== 工具定义 ====================
 
 export const AVAILABLE_TOOLS: Tool[] = [
+
+    // 网络搜索工具
+    {
+        type: 'function',
+        function: {
+            name: 'web_search',
+            description: `使用 Brave Search 进行网络搜索的工具。
+
+## 何时使用
+- 需要搜索互联网上的最新信息
+- 查询实时新闻、事件或动态
+- 获取技术文档、教程或解决方案
+- 验证事实或获取背景知识
+
+## 功能特点
+- 支持多语言搜索（中文、英文等）
+- 支持按时间过滤结果
+- 支持按地区定制搜索结果
+- 返回结构化的搜索结果（标题、链接、摘要）
+
+## 参数说明
+- query: 搜索关键词（必需）
+- count: 返回结果数量，默认10，最大20
+- country: 国家代码，如 'CN', 'US', 'JP' 等
+- searchLang: 搜索语言，如 'zh-hans', 'en' 等
+- freshness: 时间过滤
+  - 'pd': 过去一天
+  - 'pw': 过去一周
+  - 'pm': 过去一月
+  - 'py': 过去一年
+
+## 使用示例
+
+\`\`\`javascript
+// 基本搜索
+web_search({ query: "人工智能最新进展" })
+
+// 搜索英文资料
+web_search({ query: "machine learning tutorial", searchLang: "en" })
+
+// 搜索最近一周的新闻
+web_search({ query: "科技新闻", freshness: "pw" })
+
+// 指定返回数量
+web_search({ query: "Python 教程", count: 5 })
+\`\`\`
+
+## 注意事项
+- 需要在设置中配置 Brave Search API Key
+- 搜索结果来自 Brave Search API
+- 结果包含标题、链接和摘要
+- 对于敏感话题，建议使用适当的关键词`,
+            parameters: {
+                type: 'object',
+                properties: {
+                    query: {
+                        type: 'string',
+                        description: '搜索关键词或问题',
+                    },
+                    count: {
+                        type: 'number',
+                        description: '返回结果数量，默认10，最大20',
+                    },
+                    country: {
+                        type: 'string',
+                        description: '国家代码，如 CN, US, JP 等，用于定制搜索结果',
+                    },
+                    searchLang: {
+                        type: 'string',
+                        description: '搜索语言，如 zh-hans, en 等',
+                    },
+                    uiLang: {
+                        type: 'string',
+                        description: 'UI语言',
+                    },
+                    freshness: {
+                        type: 'string',
+                        description: '时间过滤：pd(过去一天), pw(过去一周), pm(过去一月), py(过去一年)',
+                        enum: ['pd', 'pw', 'pm', 'py'],
+                    },
+                },
+                required: ['query'],
+            },
+        },
+    },
 
     // SQL查询工具
     {
@@ -1629,6 +1715,21 @@ export async function siyuan_set_block_attrs(id: string, attrs: { [key: string]:
 }
 
 /**
+ * 获取 Brave Search API 配置
+ * 从设置中读取 API Key
+ */
+export function getBraveSearchConfig(): BraveSearchConfig {
+    const settings = window.siyuan?.storage?.['siyuan-plugin-copilot'];
+    const apiKey = settings?.braveSearchApiKey || '';
+    const baseUrl = settings?.braveSearchBaseUrl || undefined;
+    
+    return {
+        apiKey,
+        baseUrl
+    };
+}
+
+/**
  * 数据库操作工具
  */
 export async function siyuan_database(params: any): Promise<any> {
@@ -1791,6 +1892,19 @@ export async function executeToolCall(toolCall: ToolCall): Promise<string> {
         const args = JSON.parse(argsStr);
 
         switch (name) {
+            case 'web_search':
+                const searchConfig = getBraveSearchConfig();
+                const searchResponse = await webSearch(searchConfig, {
+                    query: args.query,
+                    count: args.count,
+                    country: args.country,
+                    searchLang: args.searchLang,
+                    uiLang: args.uiLang,
+                    freshness: args.freshness,
+                    offset: args.offset
+                });
+                return formatSearchResults(searchResponse);
+
             case 'siyuan_sql_query':
                 const results = await siyuan_sql_query(args.sql);
                 return JSON.stringify(results, null, 2);

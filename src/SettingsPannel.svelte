@@ -348,6 +348,31 @@
             ],
         },
         {
+            name: t('settings.settingsGroup.webSearch') || '网络搜索',
+            items: [
+                {
+                    key: 'braveSearchApiKey',
+                    value: settings.braveSearchApiKey,
+                    type: 'textinput',
+                    title: t('settings.braveSearchApiKey.title') || 'Brave Search API Key',
+                    description:
+                        t('settings.braveSearchApiKey.description') ||
+                        '用于 Agent 模式的网络搜索功能。获取 API Key: https://brave.com/search/api/',
+                    placeholder: 'BSA************',
+                },
+                {
+                    key: 'braveSearchBaseUrl',
+                    value: settings.braveSearchBaseUrl,
+                    type: 'textinput',
+                    title: t('settings.braveSearchBaseUrl.title') || 'Brave Search API 基础 URL',
+                    description:
+                        t('settings.braveSearchBaseUrl.description') ||
+                        '可选，留空使用默认值 https://api.search.brave.com/res/v1',
+                    placeholder: 'https://api.search.brave.com/res/v1',
+                },
+            ],
+        },
+        {
             name: t('settings.settingsGroup.translate') || '翻译设置',
             items: [
                 {
