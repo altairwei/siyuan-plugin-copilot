@@ -9,6 +9,8 @@
 export interface BraveSearchConfig {
     apiKey: string;
     baseUrl?: string;
+    httpProxy?: string;  // HTTP 代理，如 http://127.0.0.1:7890
+    socksProxy?: string; // SOCKS5 代理，如 socks5://127.0.0.1:1080
 }
 
 /**
@@ -105,6 +107,11 @@ export async function webSearch(
     }
 
     try {
+        // 浏览器环境下的代理说明：
+        // 1. 系统代理：浏览器会自动使用系统的代理设置
+        // 2. 插件配置：可以在设置中记录代理地址（供未来后端转发服务使用）
+        // 注意：直接使用 fetch 无法设置 SOCKS5 代理
+        
         const response = await fetch(url.toString(), {
             method: 'GET',
             headers: {
