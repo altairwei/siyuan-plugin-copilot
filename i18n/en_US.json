@@ -563,6 +563,12 @@
         "fetch_web_content": {
             "name": "Fetch Web Content"
         },
+        "web_search": {
+            "name": "Web Search"
+        },
+        "web_fetch": {
+            "name": "Web Fetch"
+        },
         "siyuan_sql_query": {
             "name": "SQL Query"
         },
