@@ -2653,15 +2653,28 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                 let thinking = '';
 
                 // 准备联网搜索工具（如果启用）
-                // 在所有模式下（ask/edit/agent）都启用 web_search，只要用户开启了 webSearchEnabled
                 let webSearchTools: any[] | undefined = undefined;
                 if (modelConfig.capabilities?.webSearch && modelConfig.webSearchEnabled) {
-                    // 找到 web_search 工具定义
-                    const webSearchTool = AVAILABLE_TOOLS.find(
-                        tool => tool.function.name === 'web_search'
-                    );
-                    if (webSearchTool) {
-                        webSearchTools = [webSearchTool];
+                    const modelIdLower = modelConfig.id.toLowerCase();
+
+                    if (modelIdLower.includes('gemini')) {
+                        // Gemini 使用原生 googleSearch 能力
+                        webSearchTools = [
+                            {
+                                type: 'function',
+                                function: {
+                                    name: 'googleSearch',
+                                },
+                            },
+                        ];
+                    } else {
+                        // 其他模型使用 Brave Search 工具
+                        const webSearchTool = AVAILABLE_TOOLS.find(
+                            tool => tool.function.name === 'web_search'
+                        );
+                        if (webSearchTool) {
+                            webSearchTools = [webSearchTool];
+                        }
                     }
                 }
 
@@ -4080,15 +4093,28 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
             }
 
             // 准备联网搜索工具（如果启用）
-            // 在所有模式下（ask/edit/agent）都启用 web_search，只要用户开启了 webSearchEnabled
             let webSearchTools: any[] | undefined = undefined;
             if (modelConfig.capabilities?.webSearch && modelConfig.webSearchEnabled) {
-                // 找到 web_search 工具定义
-                const webSearchTool = AVAILABLE_TOOLS.find(
-                    tool => tool.function.name === 'web_search'
-                );
-                if (webSearchTool) {
-                    webSearchTools = [webSearchTool];
+                const modelIdLower = modelConfig.id.toLowerCase();
+
+                if (modelIdLower.includes('gemini')) {
+                    // Gemini 使用原生 googleSearch 能力
+                    webSearchTools = [
+                        {
+                            type: 'function',
+                            function: {
+                                name: 'googleSearch',
+                            },
+                        },
+                    ];
+                } else {
+                    // 其他模型使用 Brave Search 工具
+                    const webSearchTool = AVAILABLE_TOOLS.find(
+                        tool => tool.function.name === 'web_search'
+                    );
+                    if (webSearchTool) {
+                        webSearchTools = [webSearchTool];
+                    }
                 }
             }
 
