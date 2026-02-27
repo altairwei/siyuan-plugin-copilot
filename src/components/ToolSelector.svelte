@@ -48,6 +48,7 @@
             name: t('tools.category.web') || '网络工具',
             tools: [
                 'web_search',
+                'web_fetch',
             ],
         },
     };
@@ -132,7 +133,8 @@
     function getToolDisplayName(toolName: string): string {
         const key = `tools.${toolName}.name`;
         const name = t(key);
-        return name === key ? toolName : name;
+        // 如果 i18n 找不到翻译，返回原始工具名
+        return name || toolName;
     }
 
     // 获取工具的简短描述

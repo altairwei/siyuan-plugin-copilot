@@ -38,6 +38,7 @@ import {
 } from '../api';
 import { getActiveEditor } from 'siyuan';
 import { webSearch, formatSearchResults, WebSearchResponse } from './webSearch';
+import { webFetch, formatFetchResult, WebFetchResponse, WebFetchConfig } from './webFetch';
 
 /**
  * 获取当前激活的编辑器 Protyle 实例
@@ -171,6 +172,70 @@ web_search({ query: "Python 教程", count: 5 })
                     },
                 },
                 required: ['query'],
+            },
+        },
+    },
+
+    // 网页获取工具
+    {
+        type: 'function',
+        function: {
+            name: 'web_fetch',
+            description: `获取网页内容并提取可读文本的工具。
+
+## 何时使用
+- 需要获取搜索结果的详细内容
+- 需要抓取网页文章正文
+- 需要提取网页的结构化数据
+
+## 功能特点
+- 支持 HTML、Markdown、JSON 等内容类型
+- 自动提取网页标题
+- 支持内容截断（避免返回过长）
+- 返回结构化结果（状态码、内容类型、提取方式等）
+
+## 参数说明
+- url: 要获取的网页 URL（必需）
+- extractMode: 提取模式
+  - 'markdown': 返回 Markdown 格式（默认）
+  - 'text': 返回纯文本格式
+- maxChars: 最大字符数，默认 8000
+
+## 使用示例
+
+\`\`\`javascript
+// 获取网页内容
+web_fetch({ url: "https://example.com/article" })
+
+// 获取纯文本
+web_fetch({ url: "https://example.com", extractMode: "text" })
+
+// 限制内容长度
+web_fetch({ url: "https://example.com", maxChars: 4000 })
+\`\`\`
+
+## 注意事项
+- 需要网络连接才能获取网页
+- 部分网站可能有反爬虫机制
+- 对于需要代理才能访问的网站，请确保系统代理已开启`,
+            parameters: {
+                type: 'object',
+                properties: {
+                    url: {
+                        type: 'string',
+                        description: '要获取的网页 URL（必需）',
+                    },
+                    extractMode: {
+                        type: 'string',
+                        description: '提取模式：markdown（默认）或 text',
+                        enum: ['markdown', 'text'],
+                    },
+                    maxChars: {
+                        type: 'number',
+                        description: '最大字符数，默认 8000',
+                    },
+                },
+                required: ['url'],
             },
         },
     },
@@ -1735,6 +1800,24 @@ export function getBraveSearchConfig(): BraveSearchConfig {
 }
 
 /**
+ * 获取 Web Fetch 配置
+ */
+export function getWebFetchConfig(): WebFetchConfig {
+    // 从 window 上的全局变量获取设置
+    const settings = (window as any).__siyuanCopilotSettings || {};
+    const httpProxy = settings?.braveSearchHttpProxy || '';
+    const socksProxy = settings?.braveSearchSocksProxy || '';
+    
+    return {
+        httpProxy: httpProxy || undefined,
+        socksProxy: socksProxy || undefined,
+        timeoutSeconds: 30,
+        maxChars: 8000,
+        readabilityEnabled: true
+    };
+}
+
+/**
  * 数据库操作工具
  */
 export async function siyuan_database(params: any): Promise<any> {
@@ -1909,6 +1992,15 @@ export async function executeToolCall(toolCall: ToolCall): Promise<string> {
                     offset: args.offset
                 });
                 return formatSearchResults(searchResponse);
+
+            case 'web_fetch':
+                const fetchConfig = getWebFetchConfig();
+                const fetchResponse = await webFetch(fetchConfig, {
+                    url: args.url,
+                    extractMode: args.extractMode,
+                    maxChars: args.maxChars
+                });
+                return formatFetchResult(fetchResponse);
 
             case 'siyuan_sql_query':
                 const results = await siyuan_sql_query(args.sql);
