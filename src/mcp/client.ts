@@ -54,22 +54,11 @@ export class McpClient {
                 version: '1.6.12',
             });
 
-            // Connect via transport
+            // Connect via transport (this includes initialize handshake)
             await this.client.connect(this.transport);
             
-            // Send initialize request
-            await this.client.request(
-                { method: 'initialize' },
-                {
-                    protocolVersion: '2024-11-05',
-                    capabilities: {},
-                    clientInfo: {
-                        name: 'siyuan-copilot',
-                        version: '1.6.12',
-                    },
-                }
-            );
-
+            // connect() already handles initialization, no need to manually call initialize
+            
             this.isInitialized = true;
             console.log('[MCP] Connected successfully via official SDK');
         } catch (error) {
