@@ -1,57 +1,80 @@
 /**
- * MCP Client Implementation
- * Handles HTTP/SSE transport for connecting to MCP servers
+ * MCP Client Implementation using official @modelcontextprotocol/sdk
+ * Uses StreamableHTTPClientTransport - the recommended transport for HTTP connections
  */
 
-import type {
-    McpConfig,
-    McpTool,
-    McpInitializeResult,
-    McpListToolsResult,
+import { Client } from '@modelcontextprotocol/sdk/client';
+import { 
+    StreamableHTTPClientTransport,
+    type StreamableHTTPClientTransportOptions 
+} from '@modelcontextprotocol/sdk/client/streamableHttp';
+import type { 
+    McpConfig, 
+    McpTool, 
     McpCallToolResult,
-    JsonRpcRequest,
-    JsonRpcResponse,
     McpErrorCode,
-    McpError,
-} from "./types.js";
+    McpError 
+} from './types.js';
 
 export class McpClient {
+    private client: Client | null = null;
     private config: McpConfig | null = null;
-    private serverInfo: McpInitializeResult | null = null;
-    private abortController: AbortController | null = null;
-    private requestId = 0;
+    private transport: StreamableHTTPClientTransport | null = null;
+    private isInitialized = false;
 
     /**
-     * Initialize connection to MCP server
+     * Initialize connection to MCP server using official SDK
      */
-    async connect(config: McpConfig): Promise<McpInitializeResult> {
+    async connect(config: McpConfig): Promise<void> {
         if (!config.serverUrl) {
-            throw new McpError(McpErrorCode.InvalidParams, "Server URL is required");
+            throw this.createError(McpErrorCode.InvalidParams, 'Server URL is required');
         }
 
         this.config = config;
-        this.abortController = new AbortController();
 
         try {
-            // Call initialize method
-            const result = await this.sendRequest<McpInitializeResult>(
-                "initialize",
+            // Create transport options
+            const transportOptions: StreamableHTTPClientTransportOptions = {
+                requestInit: {
+                    headers: config.authToken 
+                        ? { Authorization: `Bearer ${config.authToken}` }
+                        : {},
+                },
+            };
+
+            // Create transport
+            this.transport = new StreamableHTTPClientTransport(
+                new URL(config.serverUrl),
+                transportOptions
+            );
+
+            // Create client instance
+            this.client = new Client({
+                name: 'siyuan-copilot',
+                version: '1.6.12',
+            });
+
+            // Connect via transport
+            await this.client.connect(this.transport);
+            
+            // Send initialize request
+            await this.client.request(
+                { method: 'initialize' },
                 {
-                    protocolVersion: "2024-11-05",
+                    protocolVersion: '2024-11-05',
                     capabilities: {},
                     clientInfo: {
-                        name: "siyuan-copilot",
-                        version: "1.6.12",
+                        name: 'siyuan-copilot',
+                        version: '1.6.12',
                     },
                 }
             );
 
-            this.serverInfo = result;
-            console.log("[MCP] Connected to server:", result.serverInfo.name, result.serverInfo.version);
-            return result;
+            this.isInitialized = true;
+            console.log('[MCP] Connected successfully via official SDK');
         } catch (error) {
             this.disconnect();
-            throw error;
+            throw this.wrapError(error);
         }
     }
 
@@ -59,11 +82,12 @@ export class McpClient {
      * Disconnect from MCP server
      */
     disconnect(): void {
-        if (this.abortController) {
-            this.abortController.abort();
-            this.abortController = null;
+        if (this.client) {
+            this.client.close();
+            this.client = null;
         }
-        this.serverInfo = null;
+        this.transport = null;
+        this.isInitialized = false;
         this.config = null;
     }
 
@@ -71,15 +95,29 @@ export class McpClient {
      * List available tools from MCP server
      */
     async listTools(): Promise<McpTool[]> {
-        if (!this.serverInfo) {
-            throw new McpError(McpErrorCode.InvalidRequest, "Not connected to MCP server");
+        if (!this.client || !this.isInitialized) {
+            throw this.createError(McpErrorCode.InvalidRequest, 'Not connected to MCP server');
         }
 
         try {
-            const result = await this.sendRequest<McpListToolsResult>("tools/list");
-            return result.tools || [];
+            const response = await this.client.request(
+                { method: 'tools/list' },
+                {}
+            );
+
+            // Handle SDK response format
+            const tools = (response as any).tools || [];
+            return tools.map((tool: any) => ({
+                name: tool.name,
+                description: tool.description || '',
+                inputSchema: {
+                    type: 'object',
+                    properties: tool.inputSchema?.properties || {},
+                    required: tool.inputSchema?.required || [],
+                },
+            }));
         } catch (error) {
-            console.error("[MCP] Failed to list tools:", error);
+            console.error('[MCP] Failed to list tools:', error);
             return [];
         }
     }
@@ -88,24 +126,38 @@ export class McpClient {
      * Call a specific tool on MCP server
      */
     async callTool(name: string, args: Record<string, unknown>): Promise<McpCallToolResult> {
-        if (!this.serverInfo) {
-            throw new McpError(McpErrorCode.InvalidRequest, "Not connected to MCP server");
+        if (!this.client || !this.isInitialized) {
+            throw this.createError(McpErrorCode.InvalidRequest, 'Not connected to MCP server');
         }
 
         try {
-            const result = await this.sendRequest<McpCallToolResult>("tools/call", {
-                name,
-                arguments: args,
-            });
+            const response = await this.client.request(
+                { method: 'tools/call' },
+                {
+                    name,
+                    arguments: args,
+                }
+            );
+
+            const result = response as McpCallToolResult;
+            
+            // Check if result is an error
+            if (result.isError) {
+                const errorText = result.content
+                    .filter((c: any) => c.type === 'text')
+                    .map((c: any) => c.text)
+                    .join('\n');
+                throw this.createError(McpErrorCode.ServerError, errorText || 'Tool execution returned error');
+            }
+
             return result;
         } catch (error) {
-            // Re-throw with tool context
             if (error instanceof McpError) {
                 throw error;
             }
-            throw new McpError(
+            throw this.createError(
                 McpErrorCode.ServerError,
-                `Tool '${name}' execution failed: ${error instanceof Error ? error.message : "Unknown error"}`
+                `Tool '${name}' execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`
             );
         }
     }
@@ -113,13 +165,26 @@ export class McpClient {
     /**
      * Test connection to MCP server
      */
-    async testConnection(config: McpConfig): Promise<{ success: boolean; serverInfo?: McpInitializeResult; error?: string }> {
+    async testConnection(config: McpConfig): Promise<{ 
+        success: boolean; 
+        serverInfo?: { name: string; version: string }; 
+        error?: string 
+    }> {
         try {
-            const result = await this.connect(config);
+            await this.connect(config);
+            
+            // Get server info
+            const serverInfo = this.client?.serverInfo;
             this.disconnect();
-            return { success: true, serverInfo: result };
+            
+            return { 
+                success: true, 
+                serverInfo: serverInfo 
+                    ? { name: serverInfo.name, version: serverInfo.version }
+                    : undefined
+            };
         } catch (error) {
-            const message = error instanceof Error ? error.message : "Unknown error";
+            const message = error instanceof Error ? error.message : 'Unknown error';
             return { success: false, error: message };
         }
     }
@@ -128,66 +193,39 @@ export class McpClient {
      * Check if connected
      */
     isConnected(): boolean {
-        return this.serverInfo !== null;
+        return this.isInitialized && this.client !== null;
     }
 
     /**
-     * Get current server info
+     * Get server info
      */
-    getServerInfo(): McpInitializeResult | null {
-        return this.serverInfo;
+    getServerInfo(): { name: string; version: string } | null {
+        if (!this.client?.serverInfo) return null;
+        return {
+            name: this.client.serverInfo.name,
+            version: this.client.serverInfo.version,
+        };
     }
 
     /**
-     * Send JSON-RPC request to MCP server
+     * Create MCP error
      */
-    private async sendRequest<T>(method: string, params?: Record<string, unknown>): Promise<T> {
-        if (!this.config || !this.abortController) {
-            throw new McpError(McpErrorCode.InvalidRequest, "Client not initialized");
+    private createError(code: McpErrorCode, message: string): McpError {
+        return new McpError(code, message);
+    }
+
+    /**
+     * Wrap unknown error
+     */
+    private wrapError(error: unknown): McpError {
+        if (error instanceof McpError) {
+            return error;
         }
-
-        const request: JsonRpcRequest = {
-            jsonrpc: "2.0",
-            id: ++this.requestId,
-            method,
-            params,
-        };
-
-        const headers: Record<string, string> = {
-            "Content-Type": "application/json",
-        };
-
-        // Add auth token if provided
-        if (this.config.authToken) {
-            headers["Authorization"] = `Bearer ${this.config.authToken}`;
-        }
-
-        const response = await fetch(this.config.serverUrl, {
-            method: "POST",
-            headers,
-            body: JSON.stringify(request),
-            signal: this.abortController.signal,
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new McpError(
-                McpErrorCode.ServerError,
-                `HTTP ${response.status}: ${errorText}`
-            );
-        }
-
-        const jsonResponse = await response.json() as JsonRpcResponse;
-
-        if (jsonResponse.error) {
-            throw new McpError(
-                jsonResponse.error.code as McpErrorCode,
-                jsonResponse.error.message,
-                jsonResponse.error.data
-            );
-        }
-
-        return jsonResponse.result as T;
+        return new McpError(
+            McpErrorCode.InternalError,
+            error instanceof Error ? error.message : 'Unknown error',
+            error
+        );
     }
 }
 
