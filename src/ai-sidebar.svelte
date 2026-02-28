@@ -4102,6 +4102,12 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                 toolsForAgent = AVAILABLE_TOOLS.filter(tool =>
                     selectedTools.some(t => t.name === tool.function.name)
                 );
+                
+                // 合并 MCP 工具（如果已加载且用户允许）
+                if (mcpTools.length > 0) {
+                    console.log('[Sidebar] Merging MCP tools into toolsForAgent:', mcpTools.length);
+                    toolsForAgent = [...toolsForAgent, ...mcpTools];
+                }
             }
 
             // 准备联网搜索工具（如果启用）
