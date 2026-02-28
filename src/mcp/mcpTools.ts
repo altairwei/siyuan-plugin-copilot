@@ -45,42 +45,69 @@ function mcpToolToCopilotTool(mcpTool: McpTool, index: number): {
     const toolName = `mcp_${mcpTool.name}`;
 
     // Build description
-    const description = mcpTool.description
+    const description = mcpTool.description && typeof mcpTool.description === 'string'
         ? `[MCP] ${mcpTool.description}`
         : `[MCP] ${mcpTool.name} - No description available`;
 
     // Convert MCP input schema to Copilot JSON Schema format
     // Ensure inputSchema exists and has correct type
-    const safeSchema: McpInputSchema = mcpTool.inputSchema || { type: 'object' };
-    const parameters = convertMcpSchemaToJsonSchema(safeSchema);
+    const safeSchema: McpInputSchema = (mcpTool.inputSchema && typeof mcpTool.inputSchema === 'object') 
+        ? mcpTool.inputSchema 
+        : { type: 'object' };
+    
+    let parameters = convertMcpSchemaToJsonSchema(safeSchema);
+    
+    // Ensure parameters is always a valid object
+    if (!parameters || typeof parameters !== 'object') {
+        console.error(`[MCP] Tool ${index}: convertMcpSchemaToJsonSchema returned invalid value:`, parameters);
+        parameters = { type: 'object', properties: {} };
+    }
 
-    return {
+    const result = {
         function: {
             name: toolName,
             description,
             parameters,
         },
     };
+    
+    // Validate result
+    if (!result.function.name || !result.function.description || !result.function.parameters) {
+        console.error(`[MCP] Tool ${index}: Invalid result:`, result);
+    }
+    
+    return result;
 }
 
 /**
  * Convert MCP input schema to JSON Schema (Copilot compatible)
  */
 function convertMcpSchemaToJsonSchema(inputSchema: McpTool["inputSchema"]): Record<string, unknown> {
+    // Ensure we always return a valid JSON Schema object
+    if (!inputSchema || typeof inputSchema !== 'object') {
+        console.warn('[MCP] Invalid inputSchema, using default:', inputSchema);
+        return {
+            type: "object",
+            properties: {},
+        };
+    }
+
     const result: Record<string, unknown> = {
         type: "object",
         properties: {},
     };
 
-    if (inputSchema.required && inputSchema.required.length > 0) {
+    if (inputSchema.required && Array.isArray(inputSchema.required) && inputSchema.required.length > 0) {
         result.required = inputSchema.required;
     }
 
-    if (inputSchema.properties) {
+    if (inputSchema.properties && typeof inputSchema.properties === 'object') {
         const properties: Record<string, unknown> = {};
 
         for (const [key, prop] of Object.entries(inputSchema.properties)) {
-            properties[key] = convertMcpPropertyToJsonSchema(prop);
+            if (prop && typeof prop === 'object') {
+                properties[key] = convertMcpPropertyToJsonSchema(prop as any);
+            }
         }
 
         result.properties = properties;
