@@ -4,10 +4,6 @@
  */
 
 export interface WebFetchConfig {
-    apiKey?: string;           // 可选：用于 Firecrawl fallback
-    baseUrl?: string;          // 可选：Firecrawl API 地址
-    httpProxy?: string;        // HTTP 代理
-    socksProxy?: string;       // SOCKS5 代理
     timeoutSeconds?: number;   // 超时时间
     maxChars?: number;         // 最大字符数
     readabilityEnabled?: boolean; // 是否启用 Readability 提取

@@ -370,26 +370,6 @@
                         '可选，留空使用默认值 https://api.search.brave.com/res/v1',
                     placeholder: 'https://api.search.brave.com/res/v1',
                 },
-                {
-                    key: 'braveSearchHttpProxy',
-                    value: settings.braveSearchHttpProxy,
-                    type: 'textinput',
-                    title: t('settings.braveSearchHttpProxy.title') || 'HTTP 代理',
-                    description:
-                        t('settings.braveSearchHttpProxy.description') ||
-                        '可选，如 http://127.0.0.1:7890。浏览器会自动使用系统代理，此处配置供未来使用',
-                    placeholder: 'http://127.0.0.1:7890',
-                },
-                {
-                    key: 'braveSearchSocksProxy',
-                    value: settings.braveSearchSocksProxy,
-                    type: 'textinput',
-                    title: t('settings.braveSearchSocksProxy.title') || 'SOCKS5 代理',
-                    description:
-                        t('settings.braveSearchSocksProxy.description') ||
-                        '可选，如 socks5://127.0.0.1:1080。浏览器环境可能无法直接使用 SOCKS5 代理',
-                    placeholder: 'socks5://127.0.0.1:1080',
-                },
             ],
         },
         {
