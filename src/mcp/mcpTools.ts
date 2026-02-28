@@ -18,6 +18,19 @@ function mcpToolToCopilotTool(mcpTool: McpTool): {
         parameters: Record<string, unknown>;
     };
 } {
+    // Validate required fields
+    if (!mcpTool || !mcpTool.name) {
+        console.error('[MCP] Invalid tool object:', mcpTool);
+        // Return a placeholder tool to avoid breaking the array
+        return {
+            function: {
+                name: 'mcp_invalid_tool',
+                description: '[MCP] Invalid tool - missing name',
+                parameters: { type: 'object', properties: {} },
+            },
+        };
+    }
+
     // Prefix with mcp_ to avoid name collisions
     const toolName = `mcp_${mcpTool.name}`;
 
@@ -27,7 +40,9 @@ function mcpToolToCopilotTool(mcpTool: McpTool): {
         : `[MCP] ${mcpTool.name} - No description available`;
 
     // Convert MCP input schema to Copilot JSON Schema format
-    const parameters = convertMcpSchemaToJsonSchema(mcpTool.inputSchema);
+    // Ensure inputSchema exists and has correct type
+    const safeSchema: McpInputSchema = mcpTool.inputSchema || { type: 'object' };
+    const parameters = convertMcpSchemaToJsonSchema(safeSchema);
 
     return {
         function: {
