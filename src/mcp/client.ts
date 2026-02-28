@@ -127,14 +127,20 @@ export class McpClient {
         }
 
         try {
+            console.log('[MCP] Calling tool:', name, 'with args:', args);
+            
+            const requestPayload = {
+                name,
+                arguments: args,
+            };
+            console.log('[MCP] Request payload:', JSON.stringify(requestPayload));
+            
             const response = await this.client.request(
                 { method: 'tools/call' },
-                {
-                    name,
-                    arguments: args,
-                }
+                requestPayload
             );
 
+            console.log('[MCP] Tool response:', response);
             const result = response as McpCallToolResult;
 
             // Check if result is an error
