@@ -4,16 +4,16 @@
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client';
-import { 
+import {
     StreamableHTTPClientTransport,
-    type StreamableHTTPClientTransportOptions 
+    type StreamableHTTPClientTransportOptions
 } from '@modelcontextprotocol/sdk/client/streamableHttp';
-import type { 
-    McpConfig, 
-    McpTool, 
+import type {
+    McpConfig,
+    McpTool,
     McpCallToolResult,
     McpErrorCode,
-    McpError 
+    McpError
 } from './types.js';
 
 export class McpClient {
@@ -36,7 +36,7 @@ export class McpClient {
             // Create transport options
             const transportOptions: StreamableHTTPClientTransportOptions = {
                 requestInit: {
-                    headers: config.authToken 
+                    headers: config.authToken
                         ? { Authorization: `Bearer ${config.authToken}` }
                         : {},
                 },
@@ -56,9 +56,9 @@ export class McpClient {
 
             // Connect via transport (this includes initialize handshake)
             await this.client.connect(this.transport);
-            
+
             // connect() already handles initialization, no need to manually call initialize
-            
+
             this.isInitialized = true;
             console.log('[MCP] Connected successfully via official SDK');
         } catch (error) {
@@ -129,7 +129,7 @@ export class McpClient {
             );
 
             const result = response as McpCallToolResult;
-            
+
             // Check if result is an error
             if (result.isError) {
                 const errorText = result.content
@@ -154,45 +154,34 @@ export class McpClient {
     /**
      * Test connection to MCP server
      */
-    async testConnection(config: McpConfig): Promise<{ 
-        success: boolean; 
-        serverInfo?: { name: string; version: string }; 
-        error?: string 
+    async testConnection(config: McpConfig): Promise<{
+        success: boolean;
+        serverInfo?: { name: string; version: string };
+        error?: string
     }> {
         try {
             await this.connect(config);
-            
-            // Get server info
-            const serverInfo = this.client?.serverInfo;
+
+            // Get server info using SDK methods
+            const serverVersion = this.client?.getServerVersion();
+            console.log('[MCP] Server version:', serverVersion);
+
             this.disconnect();
-            
-            return { 
-                success: true, 
-                serverInfo: serverInfo 
-                    ? { name: serverInfo.name, version: serverInfo.version }
-                    : undefined
+
+            return {
+                success: true,
+                serverInfo: serverVersion
+                    ? { name: serverVersion.name, version: serverVersion.version }
+                    : { name: 'Unknown', version: 'Unknown' }
             };
         } catch (error) {
             this.disconnect();
-            
+
             // Log detailed error for debugging
             console.error('[MCP] Test connection error:', error);
             console.error('[MCP] Error type:', error instanceof Error ? error.constructor.name : typeof error);
             console.error('[MCP] Error name:', error instanceof Error ? error.name : 'N/A');
-            console.error('[MCP] Server info at error:', this.client?.serverInfo);
-            
-            // Ignore AbortError or any error if we have server info (means connection succeeded)
-            if (this.client?.serverInfo) {
-                console.log('[MCP] Connection succeeded despite error, serverInfo available');
-                return {
-                    success: true,
-                    serverInfo: { 
-                        name: this.client.serverInfo.name, 
-                        version: this.client.serverInfo.version 
-                    }
-                };
-            }
-            
+
             const message = error instanceof Error ? error.message : 'Unknown error';
             return { success: false, error: message };
         }
@@ -209,10 +198,11 @@ export class McpClient {
      * Get server info
      */
     getServerInfo(): { name: string; version: string } | null {
-        if (!this.client?.serverInfo) return null;
+        const serverVersion = this.client?.getServerVersion();
+        if (!serverVersion) return null;
         return {
-            name: this.client.serverInfo.name,
-            version: this.client.serverInfo.version,
+            name: serverVersion.name,
+            version: serverVersion.version,
         };
     }
 
