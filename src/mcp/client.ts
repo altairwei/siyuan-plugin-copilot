@@ -13,9 +13,8 @@ import type {
     McpConfig,
     McpTool,
     McpCallToolResult,
-    McpError
 } from './types.js';
-import { McpErrorCode } from './types.js';
+import { McpErrorCode, McpError } from './types.js';
 
 export class McpClient {
     private client: Client | null = null;
