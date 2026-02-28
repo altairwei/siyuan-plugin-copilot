@@ -64,6 +64,7 @@ function mcpToolToCopilotTool(mcpTool: McpTool, index: number): {
     }
 
     const result = {
+        type: 'function',  // ← 添加这个！
         function: {
             name: toolName,
             description,
