@@ -66,7 +66,14 @@ export async function invokeMcpTool(
  */
 export async function testMcp(settings: Record<string, unknown>) {
     const config = getMcpConfigFromSettings(settings);
-    return testMcpConnection(config);
+    console.log('[MCP Index] Testing with config:', { 
+        enabled: config.enabled, 
+        serverUrl: config.serverUrl,
+        hasToken: !!config.authToken 
+    });
+    const result = await testMcpConnection(config);
+    console.log('[MCP Index] Test result:', result);
+    return result;
 }
 
 /**
