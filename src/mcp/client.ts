@@ -8,6 +8,7 @@ import {
     StreamableHTTPClientTransport,
     type StreamableHTTPClientTransportOptions
 } from '@modelcontextprotocol/sdk/client/streamableHttp';
+import { ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import type {
     McpConfig,
     McpTool,
@@ -87,7 +88,7 @@ export class McpClient {
     }
 
     /**
-     * List available tools from MCP server (bypass SDK validation)
+     * List available tools from MCP server (standard SDK usage with schema validation)
      */
     async listTools(): Promise<McpTool[]> {
         if (!this.client || !this.isInitialized) {
@@ -95,80 +96,15 @@ export class McpClient {
         }
 
         try {
-            // Use direct fetch to avoid SDK zod validation
-            const requestBody = {
-                jsonrpc: '2.0',
-                id: crypto.randomUUID(),
-                method: 'tools/list',
-                params: {}
-            };
+            // Standard SDK usage with proper schema validation
+            const result = await this.client.request(
+                { method: 'tools/list' },
+                ListToolsResultSchema
+            );
 
-            const response = await fetch(this.config!.serverUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(this.config!.authToken ? { 'Authorization': `Bearer ${this.config!.authToken}` } : {})
-                },
-                body: JSON.stringify(requestBody)
-            });
+            console.log('[MCP] Loaded tools via SDK:', result.tools.length);
 
-            if (!response.ok) {
-                console.error('[MCP] HTTP error:', response.status);
-                return [];
-            }
-
-            // Handle SSE or JSON response
-            const contentType = response.headers.get('content-type');
-            let result: any;
-
-            if (contentType?.includes('text/event-stream')) {
-                // SSE response - read first event
-                const reader = response.body?.getReader();
-                if (!reader) return [];
-                
-                const decoder = new TextDecoder();
-                let buffer = '';
-                
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split('\n');
-                    
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const data = line.slice(6);
-                            if (data === '[DONE]') return [];
-                            try {
-                                result = JSON.parse(data);
-                                reader.cancel();
-                                return result.result?.tools?.map((tool: any) => ({
-                                    name: tool.name,
-                                    description: tool.description || '',
-                                    inputSchema: {
-                                        type: 'object',
-                                        properties: tool.inputSchema?.properties || {},
-                                        required: tool.inputSchema?.required || [],
-                                    },
-                                })) || [];
-                            } catch (e) {
-                                continue;
-                            }
-                        }
-                    }
-                }
-                return [];
-            } else {
-                // JSON response
-                const json = await response.json();
-                result = json.result;
-            }
-
-            const tools = result?.tools || [];
-            console.log('[MCP] Loaded tools via fetch:', tools.length);
-            
-            return tools.map((tool: any) => ({
+            return result.tools.map((tool: any) => ({
                 name: tool.name,
                 description: tool.description || '',
                 inputSchema: {
@@ -178,8 +114,8 @@ export class McpClient {
                 },
             }));
         } catch (error) {
-            console.error('[MCP] Failed to list tools:', error);
-            return [];
+            console.error('[MCP] Failed to list tools with SDK:', error);
+            throw error; // Re-throw to let caller handle
         }
     }
 
