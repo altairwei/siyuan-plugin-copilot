@@ -1,3 +1,6 @@
+## v1.6.13 / 20260228
+- 🐛 Fix Nano Banana image generation compatibility issues，感谢[altairwei](https://github.com/Achuan-2/siyuan-plugin-copilot/pull/112)贡献
+
 ## v1.6.12 / 20260224
 - 🎨 在 WebView 中打开链接默认为false
 ## v1.6.11 / 20260210
