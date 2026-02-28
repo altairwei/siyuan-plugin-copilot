@@ -530,7 +530,44 @@ async function chatOpenAIFormat(
 
     // 添加工具定义（Agent模式）
     if (options.tools && options.tools.length > 0) {
-        requestBody.tools = options.tools;
+        // 清理工具对象，确保可 JSON 序列化
+        const cleanedTools = options.tools.map((tool: any, index: number) => {
+            try {
+                // 深度克隆并清理 undefined 值
+                const cleaned = JSON.parse(JSON.stringify(tool, (key, value) => {
+                    if (value === undefined) return undefined;
+                    return value;
+                }));
+                
+                // 验证结构
+                if (!cleaned || typeof cleaned !== 'object') {
+                    console.error(`[AI Chat] Tool ${index} is not an object after cleaning:`, cleaned);
+                    return null;
+                }
+                if (!cleaned.function || typeof cleaned.function !== 'object') {
+                    console.error(`[AI Chat] Tool ${index} missing function:`, cleaned);
+                    return null;
+                }
+                if (!cleaned.function.name) {
+                    console.error(`[AI Chat] Tool ${index} missing function.name:`, cleaned);
+                    return null;
+                }
+                if (!cleaned.function.parameters || typeof cleaned.function.parameters !== 'object') {
+                    console.error(`[AI Chat] Tool ${index} missing function.parameters:`, cleaned);
+                    // 添加默认 parameters
+                    cleaned.function.parameters = { type: 'object', properties: {} };
+                }
+                
+                return cleaned;
+            } catch (e) {
+                console.error(`[AI Chat] Failed to clean tool ${index}:`, tool, e);
+                return null;
+            }
+        }).filter(Boolean); // 过滤掉 null
+        
+        console.log(`[AI Chat] Cleaned ${cleanedTools.length} tools (original: ${options.tools.length})`);
+        
+        requestBody.tools = cleanedTools;
         requestBody.tool_choice = 'auto'; // 让模型自动决定是否调用工具
     }
 
