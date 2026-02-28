@@ -71,9 +71,14 @@ export async function testMcp(settings: Record<string, unknown>) {
         serverUrl: config.serverUrl,
         hasToken: !!config.authToken 
     });
-    const result = await testMcpConnection(config);
-    console.log('[MCP Index] Test result:', result);
-    return result;
+    try {
+        const result = await testMcpConnection(config);
+        console.log('[MCP Index] Raw result from client:', result);
+        return result;
+    } catch (err) {
+        console.error('[MCP Index] Exception caught:', err);
+        return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
 }
 
 /**
