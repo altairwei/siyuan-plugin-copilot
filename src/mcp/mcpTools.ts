@@ -11,7 +11,7 @@ import { mcpToolCache } from "./cache.js";
 /**
  * Convert MCP tool to Copilot tool format
  */
-function mcpToolToCopilotTool(mcpTool: McpTool): {
+function mcpToolToCopilotTool(mcpTool: McpTool, index: number): {
     function: {
         name: string;
         description: string;
@@ -19,12 +19,22 @@ function mcpToolToCopilotTool(mcpTool: McpTool): {
     };
 } {
     // Validate required fields
-    if (!mcpTool || !mcpTool.name) {
-        console.error('[MCP] Invalid tool object:', mcpTool);
-        // Return a placeholder tool to avoid breaking the array
+    if (!mcpTool || typeof mcpTool !== 'object') {
+        console.error(`[MCP] Tool ${index}: Invalid tool object (not an object):`, mcpTool);
         return {
             function: {
-                name: 'mcp_invalid_tool',
+                name: `mcp_invalid_tool_${index}`,
+                description: '[MCP] Invalid tool - not an object',
+                parameters: { type: 'object', properties: {} },
+            },
+        };
+    }
+    
+    if (!mcpTool.name) {
+        console.error(`[MCP] Tool ${index}: Missing name:`, mcpTool);
+        return {
+            function: {
+                name: `mcp_invalid_tool_${index}`,
                 description: '[MCP] Invalid tool - missing name',
                 parameters: { type: 'object', properties: {} },
             },
@@ -172,7 +182,7 @@ export async function getMcpTools(config: McpConfig): Promise<
     const cachedTools = mcpToolCache.getTools();
     if (cachedTools) {
         console.log("[MCP] Using cached tools:", cachedTools.length);
-        return cachedTools.map(mcpToolToCopilotTool);
+        return cachedTools.map((tool, index) => mcpToolToCopilotTool(tool, index));
     }
 
     // Connect to MCP server
@@ -189,7 +199,7 @@ export async function getMcpTools(config: McpConfig): Promise<
         mcpClient.disconnect();
 
         console.log("[MCP] Loaded tools:", tools.length);
-        return tools.map(mcpToolToCopilotTool);
+        return tools.map((tool, index) => mcpToolToCopilotTool(tool, index));
     } catch (error) {
         console.error("[MCP] Failed to load tools:", error);
         mcpClient.disconnect();
