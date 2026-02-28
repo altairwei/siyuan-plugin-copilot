@@ -48,11 +48,14 @@ export class McpClient {
                 transportOptions
             );
 
-            // Create client instance
+            // Create client instance with validation disabled
             this.client = new Client({
                 name: 'siyuan-copilot',
                 version: '1.6.12',
-            });
+            }, {
+                // Disable JSON Schema validation to avoid zod errors
+                jsonSchemaValidator: undefined,
+            } as any);
 
             // Connect via transport (this includes initialize handshake)
             await this.client.connect(this.transport);
@@ -84,51 +87,21 @@ export class McpClient {
     }
 
     /**
-     * List available tools from MCP server (using raw fetch to avoid zod validation issues)
+     * List available tools from MCP server
      */
     async listTools(): Promise<McpTool[]> {
-        if (!this.client || !this.isInitialized || !this.config) {
+        if (!this.client || !this.isInitialized) {
             throw this.createError(McpErrorCode.InvalidRequest, 'Not connected to MCP server');
         }
 
         try {
-            // Use raw fetch instead of SDK request to avoid zod validation
-            const requestBody = {
-                jsonrpc: '2.0',
-                id: Date.now(),
-                method: 'tools/list',
-                params: {}
-            };
+            const response = await this.client.request(
+                { method: 'tools/list' },
+                {}
+            );
 
-            const headers: Record<string, string> = {
-                'Content-Type': 'application/json',
-            };
-
-            if (this.config.authToken) {
-                headers['Authorization'] = `Bearer ${this.config.authToken}`;
-            }
-
-            const response = await fetch(this.config.serverUrl, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(requestBody),
-            });
-
-            if (!response.ok) {
-                console.error('[MCP] HTTP error:', response.status);
-                return [];
-            }
-
-            const jsonResponse = await response.json();
-            
-            if (jsonResponse.error) {
-                console.error('[MCP] RPC error:', jsonResponse.error);
-                return [];
-            }
-
-            const tools = jsonResponse.result?.tools || [];
-            console.log('[MCP] Raw tools response:', tools.length, 'tools');
-            
+            // Handle SDK response format
+            const tools = (response as any).tools || [];
             return tools.map((tool: any) => ({
                 name: tool.name,
                 description: tool.description || '',
