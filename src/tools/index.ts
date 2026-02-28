@@ -1978,7 +1978,7 @@ export async function executeToolCall(toolCall: ToolCall): Promise<string> {
 
         // MCP 工具调用 - 以 mcp_ 前缀开头
         if (name.startsWith('mcp_')) {
-            const settings = getSettings();
+            const settings = await getSettings();  // ← 添加 await！
             console.log('[Tools] MCP tool call:', name);
             console.log('[Tools] Settings mcpEnabled:', settings.mcpEnabled);
             console.log('[Tools] Settings mcpServerUrl:', settings.mcpServerUrl);
