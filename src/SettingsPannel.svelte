@@ -438,6 +438,45 @@
                         '拒绝使用的 MCP 工具名称（逗号分隔），优先于 allowTools',
                     placeholder: 'dangerous_tool',
                 },
+                {
+                    key: 'mcpTestConnection',
+                    value: '',
+                    type: 'button',
+                    title: t('settings.mcp.testConnection.title') || '测试连接',
+                    description:
+                        t('settings.mcp.testConnection.description') ||
+                        '测试 MCP Server 连接是否正常',
+                    button: {
+                        label: t('settings.mcp.testConnection.label') || '测试连接',
+                        callback: async () => {
+                            if (!settings.mcpServerUrl) {
+                                pushErrMsg(t('settings.mcp.testConnection.errorNoUrl') || '请先填写 MCP Server URL');
+                                return;
+                            }
+                            pushMsg(t('settings.mcp.testConnection.testing') || '正在测试连接...');
+                            try {
+                                const { testMcp } = await import('./mcp');
+                                const result = await testMcp(settings);
+                                if (result.success) {
+                                    pushMsg(
+                                        (t('settings.mcp.testConnection.success') || '连接成功！Server: ') +
+                                        (result.serverInfo || 'Unknown')
+                                    );
+                                } else {
+                                    pushErrMsg(
+                                        (t('settings.mcp.testConnection.failed') || '连接失败: ') +
+                                        (result.error || 'Unknown error')
+                                    );
+                                }
+                            } catch (error) {
+                                pushErrMsg(
+                                    (t('settings.mcp.testConnection.error') || '测试失败: ') +
+                                    (error instanceof Error ? error.message : 'Unknown error')
+                                );
+                            }
+                        },
+                    },
+                },
             ],
         },
         {
