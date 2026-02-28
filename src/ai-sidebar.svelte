@@ -4075,6 +4075,18 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
 
         messagesToSend = [...systemMessages, ...limitedMessagesWithToolFix];
 
+        // 加载 MCP 工具（如果启用）
+        let mcpTools: any[] = [];
+        if (settings.mcpEnabled && settings.mcpServerUrl) {
+            try {
+                const { loadMcpTools } = await import('./mcp');
+                mcpTools = await loadMcpTools(settings);
+                console.log('[Sidebar] Loaded MCP tools:', mcpTools.length);
+            } catch (error) {
+                console.error('[Sidebar] Failed to load MCP tools:', error);
+            }
+        }
+
         // 创建新的 AbortController
         abortController = new AbortController();
 
