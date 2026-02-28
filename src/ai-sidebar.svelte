@@ -4097,6 +4097,14 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
 
             // 准备 Agent 模式的工具列表
             let toolsForAgent: any[] | undefined = undefined;
+            
+            // DEBUG: 始终显示 MCP 工具状态
+            console.log('[DEBUG] === MCP Tools Status ===');
+            console.log('[DEBUG] mcpEnabled:', settings.mcpEnabled);
+            console.log('[DEBUG] mcpTools loaded:', mcpTools.length);
+            console.log('[DEBUG] chatMode:', chatMode);
+            console.log('[DEBUG] selectedTools:', selectedTools.length);
+            
             if (chatMode === 'agent' && selectedTools.length > 0) {
                 // 根据选中的工具名称筛选出对应的工具定义
                 toolsForAgent = AVAILABLE_TOOLS.filter(tool =>
