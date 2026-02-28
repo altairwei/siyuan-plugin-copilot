@@ -58,6 +58,11 @@ export async function invokeMcpTool(
     settings: Record<string, unknown>
 ): Promise<{ success: boolean; result?: unknown; error?: string }> {
     const config = getMcpConfigFromSettings(settings);
+    console.log('[MCP Index] invokeMcpTool config:', { 
+        enabled: config.enabled, 
+        serverUrl: config.serverUrl,
+        hasToken: !!config.authToken 
+    });
     return callMcpTool(toolName, args, config);
 }
 
