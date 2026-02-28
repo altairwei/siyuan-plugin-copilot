@@ -460,36 +460,53 @@
                                 const result = await testMcp(settings);
                                 console.log('[Settings] MCP test result:', result);
                                 if (result.success) {
-                                    console.log('[Settings] Connection successful, loading tools...');
+                                    console.log('[Settings] Step 1: Connection successful');
+                                    console.log('[Settings] Step 2: result.serverInfo =', result.serverInfo);
+                                    
                                     // 获取工具列表
                                     let tools: any[] = [];
                                     try {
+                                        console.log('[Settings] Step 3: Loading tools...');
                                         tools = await loadMcpTools(settings);
-                                        console.log('[Settings] Loaded tools:', tools.length, tools);
+                                        console.log('[Settings] Step 4: Tools loaded:', tools.length);
                                     } catch (toolError) {
-                                        console.error('[Settings] Failed to load tools:', toolError);
+                                        console.error('[Settings] Step 4 Error:', toolError);
                                     }
                                     
+                                    console.log('[Settings] Step 5: Checking tools.length =', tools.length);
+                                    
                                     if (tools.length > 0) {
+                                        console.log('[Settings] Step 6: Building tool table...');
                                         // 构建工具表格
-                                        const toolTable = tools.map((tool: any, index: number) => {
-                                            console.log(`[Settings] Processing tool ${index}:`, tool);
-                                            if (!tool?.function?.name) {
-                                                console.error(`[Settings] Invalid tool at ${index}:`, tool);
-                                                return `• [Invalid tool]`;
-                                            }
-                                            const name = tool.function.name.replace('mcp_', '');
-                                            const desc = tool.function.description?.substring(0, 60) || 'No description';
-                                            return `• ${name} - ${desc}${desc.length >= 60 ? '...' : ''}`;
-                                        }).join('\n');
+                                        let toolTable = '';
+                                        try {
+                                            toolTable = tools.map((tool: any, index: number) => {
+                                                console.log(`[Settings] Step 7-${index}: Processing tool`, tool);
+                                                if (!tool?.function?.name) {
+                                                    console.error(`[Settings] Invalid tool at ${index}:`, tool);
+                                                    return `• [Invalid tool]`;
+                                                }
+                                                const name = tool.function.name.replace('mcp_', '');
+                                                const desc = tool.function.description?.substring(0, 60) || 'No description';
+                                                return `• ${name} - ${desc}${desc.length >= 60 ? '...' : ''}`;
+                                            }).join('\n');
+                                        } catch (mapError) {
+                                            console.error('[Settings] Step 7 Error:', mapError);
+                                            toolTable = '[Error building tool list]';
+                                        }
+                                        
+                                        console.log('[Settings] Step 8: toolTable built');
                                         
                                         // 显示成功消息和工具列表
-                                        const serverName = result.serverInfo?.name || 'Unknown';
-                                        console.log('[Settings] Pushing message with server:', serverName);
-                                        pushMsg(
-                                            `MCP 连接成功！Server: ${serverName}\n\n` +
-                                            `可用工具 (${tools.length}):\n${toolTable}`
-                                        );
+                                        const serverName = result?.serverInfo?.name || 'Unknown';
+                                        console.log('[Settings] Step 9: serverName =', serverName);
+                                        
+                                        const message = `MCP 连接成功！Server: ${serverName}\n\n可用工具 (${tools.length}):\n${toolTable}`;
+                                        console.log('[Settings] Step 10: Message =', message.substring(0, 100) + '...');
+                                        
+                                        console.log('[Settings] Step 11: Calling pushMsg...');
+                                        pushMsg(message);
+                                        console.log('[Settings] Step 12: pushMsg called');
                                     } else {
                                         const serverName = result.serverInfo?.name || 'Unknown';
                                         pushMsg(
