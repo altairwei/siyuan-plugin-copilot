@@ -456,7 +456,9 @@
                             pushMsg(t('settings.mcp.testConnection.testing') || '正在测试连接...');
                             try {
                                 const { testMcp, loadMcpTools } = await import('./mcp');
+                                console.log('[Settings] Starting MCP test...');
                                 const result = await testMcp(settings);
+                                console.log('[Settings] MCP test result:', result);
                                 if (result.success) {
                                     // 获取工具列表
                                     const tools = await loadMcpTools(settings);
