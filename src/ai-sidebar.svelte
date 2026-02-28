@@ -4106,7 +4106,28 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                 // 合并 MCP 工具（如果已加载且用户允许）
                 if (mcpTools.length > 0) {
                     console.log('[Sidebar] Merging MCP tools into toolsForAgent:', mcpTools.length);
-                    toolsForAgent = [...toolsForAgent, ...mcpTools];
+                    // 过滤掉无效的工具对象
+                    const validMcpTools = mcpTools.filter((tool: any) => {
+                        if (!tool || typeof tool !== 'object') {
+                            console.warn('[Sidebar] Invalid MCP tool (not an object):', tool);
+                            return false;
+                        }
+                        if (!tool.function || typeof tool.function !== 'object') {
+                            console.warn('[Sidebar] Invalid MCP tool (missing function):', tool);
+                            return false;
+                        }
+                        if (!tool.function.name || typeof tool.function.name !== 'string') {
+                            console.warn('[Sidebar] Invalid MCP tool (missing function.name):', tool);
+                            return false;
+                        }
+                        if (!tool.function.parameters || typeof tool.function.parameters !== 'object') {
+                            console.warn('[Sidebar] Invalid MCP tool (missing function.parameters):', tool);
+                            return false;
+                        }
+                        return true;
+                    });
+                    console.log('[Sidebar] Valid MCP tools after filtering:', validMcpTools.length);
+                    toolsForAgent = [...toolsForAgent, ...validMcpTools];
                 }
             }
 
