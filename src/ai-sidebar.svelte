@@ -1291,6 +1291,9 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
 
     onMount(async () => {
         settings = await plugin.loadSettings();
+        
+        // 将设置保存到 window 以便工具函数访问
+        (window as any).__siyuanCopilotSettings = settings;
 
         // 迁移旧设置到新结构
         migrateOldSettings();
@@ -2655,6 +2658,7 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                     const modelIdLower = modelConfig.id.toLowerCase();
 
                     if (modelIdLower.includes('gemini')) {
+                        // Gemini 使用原生 googleSearch 能力
                         webSearchTools = [
                             {
                                 type: 'function',
@@ -2663,14 +2667,14 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                                 },
                             },
                         ];
-                    } else if (modelIdLower.includes('claude')) {
-                        // webSearchTools = [
-                        //     {
-                        //         type: 'web_search_20250305',
-                        //         name: 'web_search',
-                        //         max_uses: modelConfig.webSearchMaxUses || 5,
-                        //     },
-                        // ];
+                    } else {
+                        // 其他模型使用 Brave Search 工具
+                        const webSearchTool = AVAILABLE_TOOLS.find(
+                            tool => tool.function.name === 'web_search'
+                        );
+                        if (webSearchTool) {
+                            webSearchTools = [webSearchTool];
+                        }
                     }
                 }
 
@@ -4090,16 +4094,11 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
 
             // 准备联网搜索工具（如果启用）
             let webSearchTools: any[] | undefined = undefined;
-            if (
-                modelConfig.capabilities?.webSearch &&
-                modelConfig.webSearchEnabled &&
-                chatMode !== 'agent'
-            ) {
-                // 根据模型类型构建不同的联网工具配置
+            if (modelConfig.capabilities?.webSearch && modelConfig.webSearchEnabled) {
                 const modelIdLower = modelConfig.id.toLowerCase();
 
                 if (modelIdLower.includes('gemini')) {
-                    // Gemini 模型使用 googleSearch 函数
+                    // Gemini 使用原生 googleSearch 能力
                     webSearchTools = [
                         {
                             type: 'function',
@@ -4108,15 +4107,14 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                             },
                         },
                     ];
-                } else if (modelIdLower.includes('claude')) {
-                    // Claude 模型使用 web_search 工具
-                    // webSearchTools = [
-                    //     {
-                    //         type: 'web_search_20250305',
-                    //         name: 'web_search',
-                    //         max_uses: modelConfig.webSearchMaxUses || 5,
-                    //     },
-                    // ];
+                } else {
+                    // 其他模型使用 Brave Search 工具
+                    const webSearchTool = AVAILABLE_TOOLS.find(
+                        tool => tool.function.name === 'web_search'
+                    );
+                    if (webSearchTool) {
+                        webSearchTools = [webSearchTool];
+                    }
                 }
             }
 

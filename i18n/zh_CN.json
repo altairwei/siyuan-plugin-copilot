@@ -544,7 +544,7 @@
     },
     "tools": {
         "category": {
-            "web": "网页工具",
+            "web": "网络工具",
             "siyuan": "思源笔记"
         },
         "selector": {
@@ -562,6 +562,12 @@
         },
         "fetch_web_content": {
             "name": "获取网页内容"
+        },
+        "web_search": {
+            "name": "网络搜索"
+        },
+        "web_fetch": {
+            "name": "网页抓取"
         },
         "siyuan_sql_query": {
             "name": "SQL查询"
