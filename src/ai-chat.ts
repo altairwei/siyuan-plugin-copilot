@@ -552,12 +552,40 @@ async function chatOpenAIFormat(
                     console.error(`[AI Chat] Tool ${index} missing function.name:`, cleaned);
                     return null;
                 }
+                // 验证并修复 parameters 结构
                 if (!cleaned.function.parameters || typeof cleaned.function.parameters !== 'object') {
-                    console.error(`[AI Chat] Tool ${index} missing function.parameters:`, cleaned);
-                    // 添加默认 parameters
+                    console.warn(`[AI Chat] Tool ${index} missing parameters, adding default`);
                     cleaned.function.parameters = { type: 'object', properties: {} };
                 }
                 
+                // 确保 parameters 有必需的字段
+                if (!cleaned.function.parameters.type) {
+                    cleaned.function.parameters.type = 'object';
+                }
+                if (!cleaned.function.parameters.properties) {
+                    cleaned.function.parameters.properties = {};
+                }
+                
+                // 检查 parameters.properties 是否为对象
+                if (typeof cleaned.function.parameters.properties !== 'object') {
+                    console.error(`[AI Chat] Tool ${index} parameters.properties is not object:`, cleaned.function.parameters.properties);
+                    cleaned.function.parameters.properties = {};
+                }
+                
+                // 最终验证：确保可以 JSON 序列化
+                try {
+                    const testJson = JSON.stringify(cleaned);
+                    const parsed = JSON.parse(testJson);
+                    if (!parsed.function || !parsed.function.name || !parsed.function.parameters) {
+                        console.error(`[AI Chat] Tool ${index} failed final validation:`, parsed);
+                        return null;
+                    }
+                } catch (e) {
+                    console.error(`[AI Chat] Tool ${index} JSON round-trip failed:`, e);
+                    return null;
+                }
+                
+                console.log(`[AI Chat] Tool ${index} cleaned successfully:`, cleaned.function.name);
                 return cleaned;
             } catch (e) {
                 console.error(`[AI Chat] Failed to clean tool ${index}:`, tool, e);
@@ -566,6 +594,20 @@ async function chatOpenAIFormat(
         }).filter(Boolean); // 过滤掉 null
         
         console.log(`[AI Chat] Cleaned ${cleanedTools.length} tools (original: ${options.tools.length})`);
+        
+        // 最终验证：检查每个工具
+        cleanedTools.forEach((tool: any, idx: number) => {
+            console.log(`[AI Chat] Final check tool ${idx}:`, tool?.function?.name);
+            if (!tool || typeof tool !== 'object') {
+                console.error(`[AI Chat] Tool ${idx} is not an object!`);
+            } else if (!tool.function) {
+                console.error(`[AI Chat] Tool ${idx} missing function!`);
+            } else if (!tool.function.name) {
+                console.error(`[AI Chat] Tool ${idx} missing function.name!`);
+            } else if (!tool.function.parameters || typeof tool.function.parameters !== 'object') {
+                console.error(`[AI Chat] Tool ${idx} parameters invalid:`, tool.function.parameters);
+            }
+        });
         
         requestBody.tools = cleanedTools;
         requestBody.tool_choice = 'auto'; // 让模型自动决定是否调用工具
