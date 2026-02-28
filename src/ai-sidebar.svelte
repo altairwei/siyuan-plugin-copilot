@@ -7947,6 +7947,18 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
 
     // 获取工具的显示名称
     function getToolDisplayName(toolName: string): string {
+        if (!toolName) return '未知工具';
+        
+        // MCP 工具：移除 mcp_ 前缀，转换为友好名称
+        if (toolName.startsWith('mcp_')) {
+            const mcpName = toolName.slice(4);
+            // 将下划线分隔转换为标题格式
+            return mcpName.split('_').map(word => 
+                word.charAt(0).toUpperCase() + word.slice(1)
+            ).join(' ');
+        }
+        
+        // 内置工具：尝试 i18n 翻译
         const key = `tools.${toolName}.name`;
         const name = t(key);
         return name === key ? toolName : name;
