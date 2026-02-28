@@ -4111,11 +4111,17 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                     selectedTools.some(t => t.name === tool.function.name)
                 );
                 
+                console.log('[DEBUG] Built-in tools selected:', toolsForAgent.length);
+                toolsForAgent.forEach((tool, idx) => {
+                    console.log(`[DEBUG] Built-in tool ${idx}:`, tool.function.name, 'type:', typeof tool, 'has function:', !!tool.function);
+                });
+                
                 // 合并 MCP 工具（如果已加载且用户允许）
                 if (mcpTools.length > 0) {
                     console.log('[Sidebar] Merging MCP tools into toolsForAgent:', mcpTools.length);
                     // 过滤掉无效的工具对象
-                    const validMcpTools = mcpTools.filter((tool: any) => {
+                    const validMcpTools = mcpTools.filter((tool: any, index: number) => {
+                        console.log(`[DEBUG] Checking MCP tool ${index}:`, tool?.function?.name || 'unknown');
                         if (!tool || typeof tool !== 'object') {
                             console.warn('[Sidebar] Invalid MCP tool (not an object):', tool);
                             return false;
@@ -4132,10 +4138,26 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                             console.warn('[Sidebar] Invalid MCP tool (missing function.parameters):', tool);
                             return false;
                         }
+                        console.log(`[DEBUG] MCP tool ${index} is valid:`, tool.function.name);
                         return true;
                     });
                     console.log('[Sidebar] Valid MCP tools after filtering:', validMcpTools.length);
+                    
+                    // DEBUG: 显示合并前的总工具数
+                    console.log('[DEBUG] Before merge - toolsForAgent length:', toolsForAgent.length);
                     toolsForAgent = [...toolsForAgent, ...validMcpTools];
+                    console.log('[DEBUG] After merge - toolsForAgent length:', toolsForAgent.length);
+                    
+                    // DEBUG: 验证每个工具
+                    toolsForAgent.forEach((tool, idx) => {
+                        const isValid = tool && typeof tool === 'object' && 
+                                       tool.function && typeof tool.function === 'object' &&
+                                       tool.function.name && tool.function.parameters;
+                        console.log(`[DEBUG] Final tool ${idx}:`, tool?.function?.name || 'unknown', 'valid:', isValid);
+                        if (!isValid) {
+                            console.error('[DEBUG] INVALID TOOL at index', idx, ':', JSON.stringify(tool));
+                        }
+                    });
                 }
             }
 
