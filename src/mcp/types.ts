@@ -93,15 +93,17 @@ export interface McpContent {
     mimeType?: string;
 }
 
-// MCP Error codes
-export enum McpErrorCode {
-    ParseError = -32700,
-    InvalidRequest = -32600,
-    MethodNotFound = -32601,
-    InvalidParams = -32602,
-    InternalError = -32603,
-    ServerError = -32000,
-}
+// MCP Error codes (as const object for better compatibility)
+export const McpErrorCode = {
+    ParseError: -32700,
+    InvalidRequest: -32600,
+    MethodNotFound: -32601,
+    InvalidParams: -32602,
+    InternalError: -32603,
+    ServerError: -32000,
+} as const;
+
+export type McpErrorCode = typeof McpErrorCode[keyof typeof McpErrorCode];
 
 // MCP Custom errors
 export class McpError extends Error {
