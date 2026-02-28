@@ -9,8 +9,6 @@
 export interface BraveSearchConfig {
     apiKey: string;
     baseUrl?: string;
-    httpProxy?: string;  // HTTP 代理，如 http://127.0.0.1:7890
-    socksProxy?: string; // SOCKS5 代理，如 socks5://127.0.0.1:1080
 }
 
 /**
