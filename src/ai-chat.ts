@@ -991,19 +991,19 @@ async function handleStreamResponse(
             }
         }
 
-        // 如果有生成的图片，调用回调
+        // 如果有生成的图片，调用回调（等待完成，避免与 onComplete 并发竞态）
         if (generatedImages.length > 0 && options.onImageGenerated) {
-            options.onImageGenerated(generatedImages);
+            await options.onImageGenerated(generatedImages);
         }
 
-        options.onComplete?.(fullText);
+        await options.onComplete?.(fullText);
     } catch (error) {
         // 检查是否是用户主动中断
         if ((error as Error).name === 'AbortError') {
             console.log('Stream reading was aborted');
             // 如果已经有部分内容，仍然调用 onComplete
             if (fullText) {
-                options.onComplete?.(fullText);
+                await options.onComplete?.(fullText);
             }
             if (thinkingText && options.onThinkingComplete) {
                 options.onThinkingComplete(thinkingText);
@@ -1056,11 +1056,12 @@ async function handleGeminiStreamResponse(
 
                     if (parts && Array.isArray(parts)) {
                         for (const part of parts) {
-                            // 处理生成的图片 (inline_data)
-                            if (part.inline_data) {
+                            // 处理生成的图片（兼容 inline_data / inlineData）
+                            const inlineData = part.inline_data || part.inlineData;
+                            if (inlineData) {
                                 const imageData: GeneratedImageData = {
-                                    mimeType: part.inline_data.mime_type || 'image/png',
-                                    data: part.inline_data.data
+                                    mimeType: inlineData.mime_type || inlineData.mimeType || 'image/png',
+                                    data: inlineData.data
                                 };
                                 generatedImages.push(imageData);
                                 continue;
@@ -1097,19 +1098,19 @@ async function handleGeminiStreamResponse(
             options.onThinkingComplete(thinkingText);
         }
 
-        // 如果有生成的图片，调用回调
+        // 如果有生成的图片，调用回调（等待完成，避免与 onComplete 并发竞态）
         if (generatedImages.length > 0 && options.onImageGenerated) {
-            options.onImageGenerated(generatedImages);
+            await options.onImageGenerated(generatedImages);
         }
 
-        options.onComplete?.(fullText);
+        await options.onComplete?.(fullText);
     } catch (error) {
         // 检查是否是用户主动中断
         if ((error as Error).name === 'AbortError') {
             console.log('Gemini stream reading was aborted');
             // 如果已经有部分内容，仍然调用 onComplete
             if (fullText) {
-                options.onComplete?.(fullText);
+                await options.onComplete?.(fullText);
             }
             if (thinkingText && options.onThinkingComplete) {
                 options.onThinkingComplete(thinkingText);
