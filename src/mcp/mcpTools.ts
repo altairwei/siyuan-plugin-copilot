@@ -164,8 +164,24 @@ export async function getMcpTools(config: McpConfig): Promise<
     try {
         await mcpClient.connect(config);
 
-        // Get tools list
-        const tools = await mcpClient.listTools();
+        // Get tools list with error handling for SDK validation issues
+        let tools: McpTool[] = [];
+        try {
+            tools = await mcpClient.listTools();
+        } catch (listError) {
+            console.error("[MCP] listTools failed:", listError);
+            // If validation fails, try to get tools using raw request
+            console.log("[MCP] Trying raw tools/list request...");
+            try {
+                const rawResponse = await (mcpClient as any).client?.request(
+                    { method: 'tools/list' },
+                    {}
+                );
+                tools = rawResponse?.tools || [];
+            } catch (rawError) {
+                console.error("[MCP] Raw request also failed:", rawError);
+            }
+        }
 
         // Cache the tools
         mcpToolCache.setTools(tools);
