@@ -84,21 +84,51 @@ export class McpClient {
     }
 
     /**
-     * List available tools from MCP server
+     * List available tools from MCP server (using raw fetch to avoid zod validation issues)
      */
     async listTools(): Promise<McpTool[]> {
-        if (!this.client || !this.isInitialized) {
+        if (!this.client || !this.isInitialized || !this.config) {
             throw this.createError(McpErrorCode.InvalidRequest, 'Not connected to MCP server');
         }
 
         try {
-            const response = await this.client.request(
-                { method: 'tools/list' },
-                {}
-            );
+            // Use raw fetch instead of SDK request to avoid zod validation
+            const requestBody = {
+                jsonrpc: '2.0',
+                id: Date.now(),
+                method: 'tools/list',
+                params: {}
+            };
 
-            // Handle SDK response format
-            const tools = (response as any).tools || [];
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+            };
+
+            if (this.config.authToken) {
+                headers['Authorization'] = `Bearer ${this.config.authToken}`;
+            }
+
+            const response = await fetch(this.config.serverUrl, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(requestBody),
+            });
+
+            if (!response.ok) {
+                console.error('[MCP] HTTP error:', response.status);
+                return [];
+            }
+
+            const jsonResponse = await response.json();
+            
+            if (jsonResponse.error) {
+                console.error('[MCP] RPC error:', jsonResponse.error);
+                return [];
+            }
+
+            const tools = jsonResponse.result?.tools || [];
+            console.log('[MCP] Raw tools response:', tools.length, 'tools');
+            
             return tools.map((tool: any) => ({
                 name: tool.name,
                 description: tool.description || '',
