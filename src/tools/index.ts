@@ -40,6 +40,7 @@ import { getActiveEditor } from 'siyuan';
 import { webSearch, formatSearchResults, WebSearchResponse } from './webSearch';
 import { webFetch, formatFetchResult, WebFetchResponse, WebFetchConfig } from './webFetch';
 import { invokeMcpTool } from '../mcp';
+import { getSettings } from '../stores/settings';
 
 /**
  * 获取当前激活的编辑器 Protyle 实例
