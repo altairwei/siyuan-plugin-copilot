@@ -475,17 +475,13 @@
                                         const toolTable = tools.map((tool: any) => {
                                             const name = tool.function.name.replace('mcp_', '');
                                             const desc = tool.function.description?.substring(0, 60) || 'No description';
-                                            return `• **${name}** - ${desc}${desc.length >= 60 ? '...' : ''}`;
+                                            return `• ${name} - ${desc}${desc.length >= 60 ? '...' : ''}`;
                                         }).join('\n');
                                         
-                                        // 显示成功消息和工具列表
-                                        confirm(
-                                            t('settings.mcp.testConnection.successTitle') || 'MCP 连接成功',
-                                            `${t('settings.mcp.testConnection.successMessage') || 'Server'}: ${result.serverInfo || 'Unknown'}\n\n` +
-                                            `${t('settings.mcp.testConnection.availableTools') || '可用工具'} (${tools.length}):\n${toolTable}`,
-                                            () => {
-                                                // 确认回调 - 可以在这里添加更多操作
-                                            }
+                                        // 显示成功消息和工具列表（使用 pushMsg 而不是 confirm）
+                                        pushMsg(
+                                            `MCP 连接成功！Server: ${result.serverInfo?.name || 'Unknown'}\n\n` +
+                                            `可用工具 (${tools.length}):\n${toolTable}`
                                         );
                                     } else {
                                         pushMsg(
