@@ -460,8 +460,15 @@
                                 const result = await testMcp(settings);
                                 console.log('[Settings] MCP test result:', result);
                                 if (result.success) {
+                                    console.log('[Settings] Connection successful, loading tools...');
                                     // 获取工具列表
-                                    const tools = await loadMcpTools(settings);
+                                    let tools: any[] = [];
+                                    try {
+                                        tools = await loadMcpTools(settings);
+                                        console.log('[Settings] Loaded tools:', tools.length, tools);
+                                    } catch (toolError) {
+                                        console.error('[Settings] Failed to load tools:', toolError);
+                                    }
                                     
                                     if (tools.length > 0) {
                                         // 构建工具表格
@@ -493,6 +500,7 @@
                                     );
                                 }
                             } catch (error) {
+                                console.error('[Settings] MCP test error:', error);
                                 pushErrMsg(
                                     (t('settings.mcp.testConnection.error') || '测试失败: ') +
                                     (error instanceof Error ? error.message : 'Unknown error')
