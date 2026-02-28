@@ -264,11 +264,11 @@ export async function testMcpConnection(
     if (result.success && result.serverInfo) {
         return {
             success: true,
-            serverInfo: `${result.serverInfo.serverInfo.name} v${result.serverInfo.serverInfo.version}`,
+            serverInfo: `${result.serverInfo.name} v${result.serverInfo.version}`,
         };
     }
 
-    return { success: false, error: result.error };
+    return { success: false, error: result.error || 'Unknown error' };
 }
 
 /**
