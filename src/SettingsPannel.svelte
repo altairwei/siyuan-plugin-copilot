@@ -373,6 +373,74 @@
             ],
         },
         {
+            name: t('settings.settingsGroup.mcp') || 'MCP (Model Context Protocol)',
+            items: [
+                {
+                    key: 'mcpEnabled',
+                    value: settings.mcpEnabled,
+                    type: 'switch',
+                    title: t('settings.mcp.enabled.title') || '启用 MCP',
+                    description:
+                        t('settings.mcp.enabled.description') ||
+                        '启用 MCP 支持后可连接外部 MCP Server 获取更多工具',
+                },
+                {
+                    key: 'mcpServerUrl',
+                    value: settings.mcpServerUrl,
+                    type: 'textinput',
+                    title: t('settings.mcp.serverUrl.title') || 'MCP Server URL',
+                    description:
+                        t('settings.mcp.serverUrl.description') ||
+                        'MCP Server 的 HTTP 端点地址，如 https://mcp.example.com',
+                    placeholder: 'https://mcp.example.com',
+                },
+                {
+                    key: 'mcpAuthToken',
+                    value: settings.mcpAuthToken,
+                    type: 'textinput',
+                    title: t('settings.mcp.authToken.title') || '认证 Token',
+                    description:
+                        t('settings.mcp.authToken.description') ||
+                        'MCP Server 的认证 Token（可选）',
+                    placeholder: 'Bearer token...',
+                },
+                {
+                    key: 'mcpTimeoutMs',
+                    value: settings.mcpTimeoutMs,
+                    type: 'number',
+                    title: t('settings.mcp.timeout.title') || '调用超时',
+                    description:
+                        t('settings.mcp.timeout.description') ||
+                        'MCP 工具调用超时时间（毫秒），默认 20000',
+                    number: {
+                        min: 1000,
+                        max: 120000,
+                        step: 1000,
+                    },
+                },
+                {
+                    key: 'mcpAllowTools',
+                    value: settings.mcpAllowTools,
+                    type: 'textinput',
+                    title: t('settings.mcp.allowTools.title') || '允许的工具列表',
+                    description:
+                        t('settings.mcp.allowTools.description') ||
+                        '允许使用的 MCP 工具名称（逗号分隔），为空则允许全部',
+                    placeholder: 'tool1, tool2, tool3',
+                },
+                {
+                    key: 'mcpDenyTools',
+                    value: settings.mcpDenyTools,
+                    type: 'textinput',
+                    title: t('settings.mcp.denyTools.title') || '拒绝的工具列表',
+                    description:
+                        t('settings.mcp.denyTools.description') ||
+                        '拒绝使用的 MCP 工具名称（逗号分隔），优先于 allowTools',
+                    placeholder: 'dangerous_tool',
+                },
+            ],
+        },
+        {
             name: t('settings.settingsGroup.translate') || '翻译设置',
             items: [
                 {
