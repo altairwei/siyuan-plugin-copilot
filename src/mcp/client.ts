@@ -173,6 +173,20 @@ export class McpClient {
                     : undefined
             };
         } catch (error) {
+            this.disconnect();
+            
+            // Ignore AbortError (SSE connection cancelled during test, but server responded)
+            if (error instanceof Error && error.name === 'AbortError') {
+                // If we have server info, the connection was successful
+                const serverInfo = this.client?.serverInfo;
+                if (serverInfo) {
+                    return {
+                        success: true,
+                        serverInfo: { name: serverInfo.name, version: serverInfo.version }
+                    };
+                }
+            }
+            
             const message = error instanceof Error ? error.message : 'Unknown error';
             return { success: false, error: message };
         }
