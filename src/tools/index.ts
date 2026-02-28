@@ -39,6 +39,7 @@ import {
 import { getActiveEditor } from 'siyuan';
 import { webSearch, formatSearchResults, WebSearchResponse } from './webSearch';
 import { webFetch, formatFetchResult, WebFetchResponse, WebFetchConfig } from './webFetch';
+import { invokeMcpTool } from '../mcp';
 
 /**
  * 获取当前激活的编辑器 Protyle 实例
@@ -1973,6 +1974,18 @@ export async function executeToolCall(toolCall: ToolCall): Promise<string> {
 
     try {
         const args = JSON.parse(argsStr);
+
+        // MCP 工具调用 - 以 mcp_ 前缀开头
+        if (name.startsWith('mcp_')) {
+            const settings = getSettings();
+            const mcpResult = await invokeMcpTool(name, args, settings);
+            if (!mcpResult.success) {
+                throw new Error(mcpResult.error || 'MCP tool call failed');
+            }
+            return typeof mcpResult.result === 'string' 
+                ? mcpResult.result 
+                : JSON.stringify(mcpResult.result, null, 2);
+        }
 
         switch (name) {
             case 'web_search':
