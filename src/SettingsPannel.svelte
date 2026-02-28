@@ -455,13 +455,35 @@
                             }
                             pushMsg(t('settings.mcp.testConnection.testing') || '正在测试连接...');
                             try {
-                                const { testMcp } = await import('./mcp');
+                                const { testMcp, loadMcpTools } = await import('./mcp');
                                 const result = await testMcp(settings);
                                 if (result.success) {
-                                    pushMsg(
-                                        (t('settings.mcp.testConnection.success') || '连接成功！Server: ') +
-                                        (result.serverInfo || 'Unknown')
-                                    );
+                                    // 获取工具列表
+                                    const tools = await loadMcpTools(settings);
+                                    
+                                    if (tools.length > 0) {
+                                        // 构建工具表格
+                                        const toolTable = tools.map((tool: any) => {
+                                            const name = tool.function.name.replace('mcp_', '');
+                                            const desc = tool.function.description?.substring(0, 60) || 'No description';
+                                            return `• **${name}** - ${desc}${desc.length >= 60 ? '...' : ''}`;
+                                        }).join('\n');
+                                        
+                                        // 显示成功消息和工具列表
+                                        confirm(
+                                            t('settings.mcp.testConnection.successTitle') || 'MCP 连接成功',
+                                            `${t('settings.mcp.testConnection.successMessage') || 'Server'}: ${result.serverInfo || 'Unknown'}\n\n` +
+                                            `${t('settings.mcp.testConnection.availableTools') || '可用工具'} (${tools.length}):\n${toolTable}`,
+                                            () => {
+                                                // 确认回调 - 可以在这里添加更多操作
+                                            }
+                                        );
+                                    } else {
+                                        pushMsg(
+                                            (t('settings.mcp.testConnection.successNoTools') || '连接成功，但未发现工具。Server: ') +
+                                            (result.serverInfo || 'Unknown')
+                                        );
+                                    }
                                 } else {
                                     pushErrMsg(
                                         (t('settings.mcp.testConnection.failed') || '连接失败: ') +
