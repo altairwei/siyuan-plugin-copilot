@@ -122,26 +122,60 @@ export class McpClient {
      * Call a specific tool on MCP server
      */
     async callTool(name: string, args: Record<string, unknown>): Promise<McpCallToolResult> {
-        if (!this.client || !this.isInitialized) {
+        if (!this.client || !this.isInitialized || !this.config) {
             throw this.createError(McpErrorCode.InvalidRequest, 'Not connected to MCP server');
         }
 
         try {
             console.log('[MCP] Calling tool:', name, 'with args:', args);
             
-            const requestPayload = {
-                name,
-                arguments: args,
+            // Use direct fetch for tool call to have full control over JSON-RPC format
+            const requestBody = {
+                jsonrpc: '2.0',
+                id: crypto.randomUUID(),
+                method: 'tools/call',
+                params: {
+                    name,
+                    arguments: args,
+                }
             };
-            console.log('[MCP] Request payload:', JSON.stringify(requestPayload));
             
-            const response = await this.client.request(
-                { method: 'tools/call' },
-                requestPayload
-            );
+            console.log('[MCP] Request body:', JSON.stringify(requestBody));
 
-            console.log('[MCP] Tool response:', response);
-            const result = response as McpCallToolResult;
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+            };
+
+            if (this.config.authToken) {
+                headers['Authorization'] = `Bearer ${this.config.authToken}`;
+            }
+
+            const response = await fetch(this.config.serverUrl, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(requestBody),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[MCP] HTTP error:', response.status, errorText);
+                throw this.createError(
+                    McpErrorCode.ServerError,
+                    `HTTP ${response.status}: ${errorText}`
+                );
+            }
+
+            const jsonResponse = await response.json();
+            console.log('[MCP] Response:', jsonResponse);
+
+            if (jsonResponse.error) {
+                throw this.createError(
+                    McpErrorCode.ServerError,
+                    jsonResponse.error.message || 'Tool execution error'
+                );
+            }
+
+            const result = jsonResponse.result as McpCallToolResult;
 
             // Check if result is an error
             if (result.isError) {
