@@ -472,21 +472,29 @@
                                     
                                     if (tools.length > 0) {
                                         // 构建工具表格
-                                        const toolTable = tools.map((tool: any) => {
+                                        const toolTable = tools.map((tool: any, index: number) => {
+                                            console.log(`[Settings] Processing tool ${index}:`, tool);
+                                            if (!tool?.function?.name) {
+                                                console.error(`[Settings] Invalid tool at ${index}:`, tool);
+                                                return `• [Invalid tool]`;
+                                            }
                                             const name = tool.function.name.replace('mcp_', '');
                                             const desc = tool.function.description?.substring(0, 60) || 'No description';
                                             return `• ${name} - ${desc}${desc.length >= 60 ? '...' : ''}`;
                                         }).join('\n');
                                         
-                                        // 显示成功消息和工具列表（使用 pushMsg 而不是 confirm）
+                                        // 显示成功消息和工具列表
+                                        const serverName = result.serverInfo?.name || 'Unknown';
+                                        console.log('[Settings] Pushing message with server:', serverName);
                                         pushMsg(
-                                            `MCP 连接成功！Server: ${result.serverInfo?.name || 'Unknown'}\n\n` +
+                                            `MCP 连接成功！Server: ${serverName}\n\n` +
                                             `可用工具 (${tools.length}):\n${toolTable}`
                                         );
                                     } else {
+                                        const serverName = result.serverInfo?.name || 'Unknown';
                                         pushMsg(
                                             (t('settings.mcp.testConnection.successNoTools') || '连接成功，但未发现工具。Server: ') +
-                                            (result.serverInfo || 'Unknown')
+                                            serverName
                                         );
                                     }
                                 } else {
