@@ -1985,9 +1985,11 @@ export default class PluginSample extends Plugin {
      * 保存设置
      */
     async saveSettings(settings: any) {
+        console.log('[Plugin] saveSettings called with mcpServerUrl:', settings.mcpServerUrl);
         await this.saveData(SETTINGS_FILE, settings);
         // 更新 store，通知所有订阅者
         updateSettings(settings);
+        console.log('[Plugin] Settings saved successfully');
     }
 
     /**
