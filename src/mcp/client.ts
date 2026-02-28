@@ -72,7 +72,10 @@ export class McpClient {
      */
     disconnect(): void {
         if (this.client) {
-            this.client.close();
+            // close() returns Promise; swallow cleanup failures to avoid breaking test flow.
+            void this.client.close().catch((error: unknown) => {
+                console.warn('[MCP] Ignoring close() error during disconnect:', error);
+            });
             this.client = null;
         }
         this.transport = null;
