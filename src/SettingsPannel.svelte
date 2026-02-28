@@ -378,7 +378,7 @@
                 {
                     key: 'mcpEnabled',
                     value: settings.mcpEnabled,
-                    type: 'switch',
+                    type: 'checkbox',  // 修复：用 checkbox 而不是 switch
                     title: t('settings.mcp.enabled.title') || '启用 MCP',
                     description:
                         t('settings.mcp.enabled.description') ||
