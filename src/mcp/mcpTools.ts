@@ -210,7 +210,18 @@ export async function getMcpTools(config: McpConfig): Promise<
     const cachedTools = mcpToolCache.getTools();
     if (cachedTools) {
         console.log("[MCP] Using cached tools:", cachedTools.length);
-        return cachedTools.map((tool, index) => mcpToolToCopilotTool(tool, index));
+        
+        // Filter cached tools based on allowTools/denyTools config
+        let filteredTools = cachedTools;
+        if (config.allowTools && config.allowTools.length > 0) {
+            filteredTools = filteredTools.filter(tool => config.allowTools.includes(tool.name));
+        }
+        if (config.denyTools && config.denyTools.length > 0) {
+            filteredTools = filteredTools.filter(tool => !config.denyTools.includes(tool.name));
+        }
+        
+        console.log("[MCP] Filtered cached tools:", filteredTools.length);
+        return filteredTools.map((tool, index) => mcpToolToCopilotTool(tool, index));
     }
 
     // Connect to MCP server
@@ -220,14 +231,28 @@ export async function getMcpTools(config: McpConfig): Promise<
         // Get tools list
         const tools = await mcpClient.listTools();
 
-        // Cache the tools
+        // Cache the tools (store all tools from server)
         mcpToolCache.setTools(tools);
 
         // Disconnect after getting tools (MVP: don't keep persistent connection)
         mcpClient.disconnect();
 
-        console.log("[MCP] Loaded tools:", tools.length);
-        return tools.map((tool, index) => mcpToolToCopilotTool(tool, index));
+        // Filter tools based on allowTools config
+        // If allowTools is empty, allow all; otherwise only allow listed tools
+        let filteredTools = tools;
+        if (config.allowTools && config.allowTools.length > 0) {
+            filteredTools = tools.filter(tool => config.allowTools.includes(tool.name));
+            console.log("[MCP] Filtered tools by allowlist:", filteredTools.length, "of", tools.length);
+        }
+
+        // Also filter by denyTools
+        if (config.denyTools && config.denyTools.length > 0) {
+            filteredTools = filteredTools.filter(tool => !config.denyTools.includes(tool.name));
+            console.log("[MCP] Filtered tools by denylist:", filteredTools.length, "remaining");
+        }
+
+        console.log("[MCP] Loaded tools:", filteredTools.length);
+        return filteredTools.map((tool, index) => mcpToolToCopilotTool(tool, index));
     } catch (error) {
         console.error("[MCP] Failed to load tools:", error);
         mcpClient.disconnect();
