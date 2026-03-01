@@ -6,7 +6,7 @@
 </script>
 
 <script lang="ts">
-    import { createEventDispatcher } from 'svelte';
+    import { createEventDispatcher, onMount } from 'svelte';
     import { AVAILABLE_TOOLS, type Tool } from '../tools';
     import { t } from '../utils/i18n';
 
@@ -17,14 +17,65 @@
     // 使用本地状态管理选中工具，避免双向绑定的问题
     let localSelectedTools: ToolConfig[] = [...selectedTools];
 
+    // MCP 工具列表
+    let mcpTools: Tool[] = [];
+    let mcpToolsLoading = false;
+
     // 当外部 selectedTools 改变时，同步到本地状态
     $: if (selectedTools) {
         localSelectedTools = [...selectedTools];
     }
 
+    // 组件挂载时加载 MCP 工具
+    onMount(async () => {
+        await loadMcpTools();
+    });
+
+    // 加载 MCP 工具
+    async function loadMcpTools() {
+        try {
+            // 动态导入 settings 和 mcp 模块
+            const { getMcpTools } = await import('../mcp/mcpTools');
+            
+            // 获取插件设置
+            const plugin = (window as any).siyuan?.ws?.app?.plugins?.find(
+                (p: any) => p.name === 'siyuan-plugin-copilot'
+            );
+            
+            if (!plugin || !plugin.settings?.mcpEnabled) {
+                return;
+            }
+
+            mcpToolsLoading = true;
+            
+            const config = {
+                enabled: plugin.settings.mcpEnabled,
+                serverUrl: plugin.settings.mcpServerUrl,
+                authToken: plugin.settings.mcpAuthToken || '',
+                transport: 'http' as const,
+                timeoutMs: plugin.settings.mcpTimeoutMs || 20000,
+                maxArgChars: plugin.settings.mcpMaxArgChars || 12000,
+                allowTools: (plugin.settings.mcpAllowTools || '').split(',').map((t: string) => t.trim()).filter((t: string) => t),
+                denyTools: [],
+                refreshToolsOnStart: false,
+            };
+
+            const tools = await getMcpTools(config);
+            mcpTools = tools;
+            
+            console.log('[ToolSelector] Loaded MCP tools:', tools.length);
+        } catch (error) {
+            console.error('[ToolSelector] Failed to load MCP tools:', error);
+            mcpTools = [];
+        } finally {
+            mcpToolsLoading = false;
+        }
+    }
+
     function close() {
         dispatch('close');
     }
+
     const toolCategories = {
         siyuan: {
             name: t('tools.category.siyuan'),
@@ -62,6 +113,9 @@
             .filter(tool => tool !== undefined) as Tool[];
     }
 
+    // 所有可用工具（内置 + MCP）
+    $: allAvailableTools = [...AVAILABLE_TOOLS, ...mcpTools];
+
     // 切换工具选择
     function toggleTool(toolName: string) {
         const index = localSelectedTools.findIndex(t => t.name === toolName);
@@ -98,12 +152,12 @@
 
     // 全选/取消全选
     function toggleAll() {
-        if (localSelectedTools.length === AVAILABLE_TOOLS.length) {
+        if (localSelectedTools.length === allAvailableTools.length) {
             // 取消全选
             localSelectedTools = [];
         } else {
             // 全选
-            localSelectedTools = AVAILABLE_TOOLS.map(tool => ({
+            localSelectedTools = allAvailableTools.map(tool => ({
                 name: tool.function.name,
                 autoApprove: false,
             }));
@@ -133,7 +187,10 @@
     function getToolDisplayName(toolName: string): string {
         const key = `tools.${toolName}.name`;
         const name = t(key);
-        // 如果 i18n 找不到翻译，返回原始工具名
+        // 如果 i18n 找不到翻译，返回原始工具名（去掉 mcp_ 前缀）
+        if (!name && toolName.startsWith('mcp_')) {
+            return toolName.replace('mcp_', '');
+        }
         return name || toolName;
     }
 
@@ -265,6 +322,95 @@
                 </div>
             </div>
         {/each}
+
+        <!-- MCP 工具分类 -->
+        {#if mcpTools.length > 0}
+            <div class="tool-category">
+                <h4 class="tool-category__title">MCP Server</h4>
+                <div class="tool-list">
+                    {#each mcpTools as tool (tool.function.name)}
+                        {@const toolName = tool.function.name}
+                        {@const isExpanded = expandedTools.has(toolName)}
+
+                        <div
+                            class="tool-item"
+                            class:tool-item--selected={selectedSet.has(toolName)}
+                        >
+                            <div class="tool-item__header">
+                                <label class="tool-item__checkbox">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedSet.has(toolName)}
+                                        on:change={() => toggleTool(toolName)}
+                                    />
+                                    <span class="tool-item__name">
+                                        {getToolDisplayName(toolName)}
+                                    </span>
+                                </label>
+                                <div class="tool-item__header-right">
+                                    <label
+                                        class="tool-item__auto-approve"
+                                        title={t('tools.autoApprove.tooltip')}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            class="b3-switch"
+                                            checked={autoApproveMap.get(toolName) || false}
+                                            on:change={() => toggleToolAutoApprove(toolName)}
+                                        />
+                                        <span class="tool-item__auto-approve-text">
+                                            {t('tools.autoApprove.label')}
+                                        </span>
+                                    </label>
+                                    <button
+                                        class="tool-item__expand b3-button b3-button--text"
+                                        on:click={() => toggleExpand(toolName)}
+                                        title={isExpanded
+                                            ? t('common.collapse')
+                                            : t('common.expand')}
+                                    >
+                                        <svg
+                                            class="svg"
+                                            class:tool-item__expand--rotated={isExpanded}
+                                        >
+                                            <use xlink:href="#iconRight"></use>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="tool-item__description">
+                                {getToolShortDescription(tool)}
+                            </div>
+
+                            {#if isExpanded}
+                                <div class="tool-item__details">
+                                    <pre class="tool-item__full-description">{tool.function
+                                            .description}</pre>
+
+                                    <div class="tool-item__parameters">
+                                        <strong>{t('tools.selector.parameters')}:</strong>
+                                        <ul>
+                                            {#each Object.entries(tool.function.parameters.properties) as [paramName, param]}
+                                                <li>
+                                                    <code>{paramName}</code>
+                                                    {#if tool.function.parameters.required.includes(paramName)}
+                                                        <span class="tool-item__required">
+                                                            ({t('common.required')})
+                                                        </span>
+                                                    {/if}
+                                                    : {param.description}
+                                                </li>
+                                            {/each}
+                                        </ul>
+                                    </div>
+                                </div>
+                            {/if}
+                        </div>
+                    {/each}
+                </div>
+            </div>
+        {/if}
     </div>
 
     <div class="tool-selector__footer">
@@ -275,7 +421,7 @@
             </div>
         </div>
         <span class="tool-selector__count">
-            {t('tools.selector.selected')}: {localSelectedTools.length}/{AVAILABLE_TOOLS.length}
+            {t('tools.selector.selected')}: {localSelectedTools.length}/{allAvailableTools.length}
         </span>
     </div>
 </div>
