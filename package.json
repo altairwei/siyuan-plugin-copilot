@@ -14,7 +14,8 @@
     "make_dev_copy": "node --no-warnings ./scripts/make_dev_copy.js",
     "update-version": "node --no-warnings ./scripts/update_version.js",
     "make-install": "vite build && node --no-warnings ./scripts/make_install.js",
-    "test:mcp": "node --no-warnings ./scripts/test-mcp-connection.mjs"
+    "test:mcp": "node --no-warnings ./scripts/test-mcp-connection.mjs",
+    "test": "node --no-warnings ./scripts/test-playwright.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^3.1.0",
@@ -25,6 +26,7 @@
     "glob": "^10.0.0",
     "js-yaml": "^4.1.0",
     "minimist": "^1.2.8",
+    "playwright": "^1.58.2",
     "rollup-plugin-livereload": "^2.0.5",
     "sass": "^1.63.3",
     "siyuan": "1.1.5",
