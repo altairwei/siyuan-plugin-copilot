@@ -10,7 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import { log, error, getSiYuanDir, chooseTarget, getThisPluginName, copyDirectory } from './utils.js';
 
-let targetDir = `D:\\Notes\\Siyuan\\Achuan-2\\data\\plugins`;
+let targetDir = `D:\\SiYuan\\data\\plugins`;
 // let targetDir =`C:\\Users\\wangmin\\Documents\\siyuan_plugins_test\\data\\plugins`;
 // let targetDir =`C:\\Users\\wangmin\\Documents\\Project Code\\notebook\\data\\plugins`;
 
@@ -80,3 +80,20 @@ if (!fs.existsSync(targetPath)) {
  */
 copyDirectory(devDir, targetPath);
 log(`>>> Successfully synchronized all files to SiYuan plugins directory!`);
+
+/**
+ * 6. Trigger SiYuan frontend reload via API
+ */
+try {
+    const response = await fetch('http://127.0.0.1:6806/api/ui/reloadUI', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+    });
+    const result = await response.json();
+    if (result.code === 0) {
+        log(`>>> SiYuan frontend reloaded.`);
+    }
+} catch (e) {
+    // SiYuan 未运行时静默忽略
+}
