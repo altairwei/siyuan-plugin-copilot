@@ -35,6 +35,27 @@ export interface CustomProviderConfig extends ProviderConfig {
     name: string;
 }
 
+// 内置 MCP Server 定义
+export interface BuiltInMcpServer {
+    id: string; // 固定 ID，如 'github'
+    name: string; // 显示名称
+    description: string;
+    url: string; // 固定 URL
+    defaultTools: string[];
+    website?: string; // 获取 Token 的帮助链接
+}
+
+export const BUILT_IN_MCP_SERVERS: Record<string, BuiltInMcpServer> = {
+    github: {
+        id: 'github',
+        name: 'GitHub',
+        description: '管理 GitHub 仓库、Issue、PR、Actions 等',
+        url: 'https://api.githubcopilot.com/mcp/',
+        defaultTools: ['repos', 'issues', 'pull_requests', 'actions', 'code_security'],
+        website: 'https://github.com/settings/tokens?type=pat',
+    },
+};
+
 export const getDefaultSettings = () => ({
     textinput: t('settings.textinput.value'),
     slider: 0.5,
