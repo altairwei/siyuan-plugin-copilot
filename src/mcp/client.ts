@@ -1,13 +1,12 @@
 /**
  * MCP Client Implementation using official @modelcontextprotocol/sdk
- * Uses StreamableHTTPClientTransport - the recommended transport for HTTP connections
+ * Supports both StreamableHTTP and SSE transports with automatic fallback
+ * following the SDK's official backwards-compatible client example.
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client';
-import {
-    StreamableHTTPClientTransport,
-    type StreamableHTTPClientTransportOptions
-} from '@modelcontextprotocol/sdk/client/streamableHttp';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse';
 import { ListToolsResultSchema, CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import type {
     McpConfig,
@@ -16,14 +15,19 @@ import type {
 } from './types.js';
 import { McpErrorCode, McpError } from './types.js';
 
+type McpTransport = StreamableHTTPClientTransport | SSEClientTransport;
+
 export class McpClient {
     private client: Client | null = null;
     private config: McpConfig | null = null;
-    private transport: StreamableHTTPClientTransport | null = null;
+    private transport: McpTransport | null = null;
     private isInitialized = false;
 
     /**
-     * Initialize connection to MCP server using official SDK
+     * Initialize connection to MCP server using official SDK.
+     * Following the SDK's backwards-compatible example:
+     * 1. Try StreamableHTTP first (modern protocol)
+     * 2. Fall back to SSE transport (older protocol) if StreamableHTTP fails
      */
     async connect(config: McpConfig): Promise<void> {
         if (!config.serverUrl) {
@@ -31,42 +35,57 @@ export class McpClient {
         }
 
         this.config = config;
+        const url = new URL(config.serverUrl);
+        const authHeaders = config.authToken
+            ? { Authorization: `Bearer ${config.authToken}` }
+            : {};
 
+        // Step 1: Try StreamableHTTP transport first
         try {
-            // Create transport options
-            const transportOptions: StreamableHTTPClientTransportOptions = {
-                requestInit: {
-                    headers: config.authToken
-                        ? { Authorization: `Bearer ${config.authToken}` }
-                        : {},
-                },
-            };
-
-            // Create transport
-            this.transport = new StreamableHTTPClientTransport(
-                new URL(config.serverUrl),
-                transportOptions
-            );
-
-            // Create client instance with validation disabled
-            this.client = new Client({
+            console.log('[MCP] Trying StreamableHTTP transport...');
+            const transport = new StreamableHTTPClientTransport(url, {
+                requestInit: { headers: { ...authHeaders } },
+            });
+            const client = new Client({
                 name: 'siyuan-copilot',
                 version: '1.6.12',
-            }, {
-                // Disable JSON Schema validation to avoid zod errors
-                jsonSchemaValidator: undefined,
-            } as any);
+            });
 
-            // Connect via transport (this includes initialize handshake)
-            await this.client.connect(this.transport);
+            await client.connect(transport);
 
-            // connect() already handles initialization, no need to manually call initialize
-
+            this.client = client;
+            this.transport = transport;
             this.isInitialized = true;
-            console.log('[MCP] Connected successfully via official SDK');
-        } catch (error) {
+            console.log('[MCP] Connected via StreamableHTTP transport');
+            return;
+        } catch (error: any) {
+            console.log('[MCP] StreamableHTTP failed:', error?.message);
+        }
+
+        // Step 2: Fall back to SSE transport (for older servers like Aliyun Bailian)
+        try {
+            console.log('[MCP] Falling back to SSE transport...');
+            const transport = new SSEClientTransport(url, {
+                requestInit: { headers: { ...authHeaders } },
+            });
+            const client = new Client({
+                name: 'siyuan-copilot',
+                version: '1.6.12',
+            });
+
+            await client.connect(transport);
+
+            this.client = client;
+            this.transport = transport;
+            this.isInitialized = true;
+            console.log('[MCP] Connected via SSE transport');
+            return;
+        } catch (sseError: any) {
+            console.error('[MCP] SSE transport also failed:', sseError?.message);
             this.disconnect();
-            throw this.wrapError(error);
+            throw this.wrapError(
+                new Error(`Could not connect with any transport.\nStreamableHTTP: ${sseError?.message}\nSSE: ${sseError?.message}`)
+            );
         }
     }
 
