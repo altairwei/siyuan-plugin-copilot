@@ -9,8 +9,10 @@
     import { createEventDispatcher, onMount } from 'svelte';
     import { AVAILABLE_TOOLS, type Tool } from '../tools';
     import { t } from '../utils/i18n';
+    import { settingsStore } from '../stores/settings';
 
     export let selectedTools: ToolConfig[] = [];
+    export let plugin: any = null;
 
     const dispatch = createEventDispatcher();
 
@@ -20,6 +22,9 @@
     // MCP 工具列表
     let mcpTools: Tool[] = [];
     let mcpToolsLoading = false;
+
+    // 监听 mcpTools 变化
+    $: console.log('[ToolSelector] mcpTools changed:', mcpTools.length, mcpTools);
 
     // 当外部 selectedTools 改变时，同步到本地状态
     $: if (selectedTools) {
@@ -33,42 +38,60 @@
 
     // 加载 MCP 工具
     async function loadMcpTools() {
-        try {
-            // 动态导入 settings 和 mcp 模块
-            const { getMcpTools } = await import('../mcp/mcpTools');
-            
-            // 获取插件设置
-            const plugin = (window as any).siyuan?.ws?.app?.plugins?.find(
-                (p: any) => p.name === 'siyuan-plugin-copilot'
-            );
-            
-            if (!plugin || !plugin.settings?.mcpEnabled) {
-                return;
-            }
+        console.log('[ToolSelector] ====================');
+        console.log('[ToolSelector] loadMcpTools called');
+        
+        // 从 store 获取设置
+        let settings: any;
+        settingsStore.subscribe(s => { settings = s; })();
+        
+        console.log('[ToolSelector] settings from store:', settings);
+        console.log('[ToolSelector] settings.mcpEnabled:', settings?.mcpEnabled);
+        console.log('[ToolSelector] settings.mcpAllowTools:', settings?.mcpAllowTools);
+        
+        if (!settings?.mcpEnabled) {
+            console.log('[ToolSelector] ❌ MCP not enabled');
+            return;
+        }
 
+        try {
+            const { getMcpTools, refreshMcpTools } = await import('../mcp/mcpTools');
+            console.log('[ToolSelector] MCP module loaded');
+            
             mcpToolsLoading = true;
             
+            const rawAllowTools = settings.mcpAllowTools || '';
+            const parsedAllowTools = rawAllowTools.split(',').map((t: string) => t.trim()).filter((t: string) => t);
+            console.log('[ToolSelector] Raw mcpAllowTools:', rawAllowTools);
+            console.log('[ToolSelector] Parsed allowTools:', parsedAllowTools);
+            
             const config = {
-                enabled: plugin.settings.mcpEnabled,
-                serverUrl: plugin.settings.mcpServerUrl,
-                authToken: plugin.settings.mcpAuthToken || '',
+                enabled: settings.mcpEnabled,
+                serverUrl: settings.mcpServerUrl,
+                authToken: settings.mcpAuthToken || '',
                 transport: 'http' as const,
-                timeoutMs: plugin.settings.mcpTimeoutMs || 20000,
-                maxArgChars: plugin.settings.mcpMaxArgChars || 12000,
-                allowTools: (plugin.settings.mcpAllowTools || '').split(',').map((t: string) => t.trim()).filter((t: string) => t),
+                timeoutMs: settings.mcpTimeoutMs || 20000,
+                maxArgChars: settings.mcpMaxArgChars || 12000,
+                allowTools: parsedAllowTools,
                 denyTools: [],
-                refreshToolsOnStart: false,
+                refreshToolsOnStart: true,
             };
 
+            console.log('[ToolSelector] MCP config:', JSON.stringify(config, null, 2));
+            
+            refreshMcpTools();
+            
             const tools = await getMcpTools(config);
             mcpTools = tools;
             
-            console.log('[ToolSelector] Loaded MCP tools:', tools.length);
+            console.log('[ToolSelector] ✅ Loaded MCP tools:', tools.length);
+            console.log('[ToolSelector] Tools:', tools.map((t: any) => t.function?.name));
         } catch (error) {
-            console.error('[ToolSelector] Failed to load MCP tools:', error);
+            console.error('[ToolSelector] ❌ Failed to load MCP tools:', error);
             mcpTools = [];
         } finally {
             mcpToolsLoading = false;
+            console.log('[ToolSelector] ====================');
         }
     }
 
