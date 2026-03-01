@@ -11514,7 +11514,7 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
 
     <!-- 工具选择器对话框 -->
     {#if isToolSelectorOpen}
-        <ToolSelector bind:selectedTools on:close={() => (isToolSelectorOpen = false)} />
+        <ToolSelector bind:selectedTools {plugin} on:close={() => (isToolSelectorOpen = false)} />
     {/if}
 
     <!-- 保存到笔记对话框 -->

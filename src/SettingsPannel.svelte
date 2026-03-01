@@ -12,12 +12,31 @@
     // 使用动态默认设置
     let settings = { ...getDefaultSettings() };
 
-    // MCP 工具选择器状态
-    let mcpToolsLoading = false;
-    let mcpToolsError = '';
-    let mcpToolsList: Array<{name: string, description: string, selected: boolean}> = [];
+    // MCP 多 Server 管理状态
+    let selectedMcpServerId = '';
+    let showAddMcpServer = false;
+    let newMcpServerName = '';
+    let newMcpServerUrl = '';
+    
+    // 当前选中 Server 的工具列表
+    let mcpServerTools: Array<{name: string, description: string, selected: boolean}> = [];
+    let mcpServerToolsLoading = false;
+    let mcpServerToolsError = '';
     let mcpToolsSearchQuery = '';
-    let mcpServerInfo = '';
+    
+    // 获取当前选中的 Server
+    $: selectedMcpServer = settings.mcpServers?.find(s => s.id === selectedMcpServerId);
+    
+    // 过滤后的工具列表
+    $: filteredMcpServerTools = mcpServerTools.filter(tool => {
+        if (!mcpToolsSearchQuery) return true;
+        const query = mcpToolsSearchQuery.toLowerCase();
+        return tool.name.toLowerCase().includes(query) || 
+               tool.description.toLowerCase().includes(query);
+    });
+    
+    // 选中的工具数量
+    $: selectedMcpToolsCount = mcpServerTools.filter(t => t.selected).length;
 
     // 笔记本列表
     let notebookOptions: Record<string, string> = {};
@@ -234,62 +253,117 @@
         saveSettings();
     }
 
-    // ==================== MCP 工具选择器功能 ====================
+    // ==================== MCP 多 Server 管理 ====================
 
-    // 获取当前已允许的工具列表
-    $: currentAllowedTools = (settings.mcpAllowTools || '')
-        .split(',')
-        .map(t => t.trim())
-        .filter(t => t);
+    // 生成唯一 ID
+    function generateMcpServerId(): string {
+        return `mcp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
 
-    // 过滤后的工具列表
-    $: filteredMcpTools = mcpToolsList.filter(tool => {
-        if (!mcpToolsSearchQuery) return true;
-        const query = mcpToolsSearchQuery.toLowerCase();
-        return tool.name.toLowerCase().includes(query) || 
-               tool.description.toLowerCase().includes(query);
-    });
-
-    // 选中的工具数量
-    $: selectedMcpToolsCount = mcpToolsList.filter(t => t.selected).length;
-
-    // 拉取 MCP 工具列表
-    async function fetchMcpTools() {
-        if (!settings.mcpServerUrl) {
-            pushErrMsg(t('settings.mcp.fetchTools.errorNoUrl') || '请先填写 MCP Server URL');
+    // 添加 MCP Server
+    function addMcpServer() {
+        if (!newMcpServerName.trim() || !newMcpServerUrl.trim()) {
+            pushErrMsg('请填写 Server 名称和 URL');
             return;
         }
 
-        mcpToolsLoading = true;
-        mcpToolsError = '';
-        
+        const newServer = {
+            id: generateMcpServerId(),
+            name: newMcpServerName.trim(),
+            url: newMcpServerUrl.trim(),
+            authToken: '',
+            timeoutMs: 20000,
+            maxArgChars: 12000,
+            enabled: true,
+            allowTools: [],
+        };
+
+        settings = {
+            ...settings,
+            mcpServers: [...(settings.mcpServers || []), newServer],
+        };
+
+        selectedMcpServerId = newServer.id;
+        newMcpServerName = '';
+        newMcpServerUrl = '';
+        showAddMcpServer = false;
+        mcpServerTools = [];
+
+        saveSettings();
+        pushMsg('MCP Server 已添加');
+    }
+
+    // 删除 MCP Server
+    function removeMcpServer(serverId: string) {
+        const server = settings.mcpServers?.find(s => s.id === serverId);
+        if (!server) return;
+
+        confirm(
+            '删除 MCP Server',
+            `确定要删除 "${server.name}" 吗？`,
+            () => {
+                settings = {
+                    ...settings,
+                    mcpServers: settings.mcpServers.filter(s => s.id !== serverId),
+                };
+
+                if (selectedMcpServerId === serverId) {
+                    selectedMcpServerId = '';
+                    mcpServerTools = [];
+                }
+
+                saveSettings();
+                pushMsg('MCP Server 已删除');
+            }
+        );
+    }
+
+    // 拉取 MCP Server 工具列表
+    async function fetchMcpServerTools() {
+        if (!selectedMcpServer) return;
+
+        console.log('[Settings] fetchMcpServerTools called');
+        console.log('[Settings] Server:', selectedMcpServer);
+
+        mcpServerToolsLoading = true;
+        mcpServerToolsError = '';
+
         try {
             const { testMcp, loadMcpTools } = await import('./mcp');
-            
+
+            const serverConfig = {
+                mcpEnabled: selectedMcpServer.enabled,
+                mcpServerUrl: selectedMcpServer.url,
+                mcpAuthToken: selectedMcpServer.authToken,
+                mcpTimeoutMs: selectedMcpServer.timeoutMs,
+                mcpMaxArgChars: selectedMcpServer.maxArgChars,
+                mcpAllowTools: '', // 获取所有工具用于展示
+            };
+
             // 测试连接
-            const result = await testMcp(settings);
-            
+            const result = await testMcp(serverConfig);
+            console.log('[Settings] Test result:', result);
+
             if (!result.success) {
-                mcpToolsError = result.error || 'Connection failed';
-                mcpToolsLoading = false;
+                mcpServerToolsError = result.error || 'Connection failed';
+                mcpServerToolsLoading = false;
                 return;
             }
 
-            mcpServerInfo = result.serverInfo || 'Unknown Server';
+            // 加载工具（不传 allowTools，获取所有）
+            const loadedTools = await loadMcpTools(serverConfig);
+            console.log('[Settings] Loaded tools:', loadedTools.length);
 
-            // 加载工具
-            const loadedTools = await loadMcpTools(settings);
-            
             // 转换为本地格式
-            mcpToolsList = loadedTools.map((tool: any) => {
-                const toolName = tool.function?.name?.replace('mcp_', '') || tool.name || '';
-                const description = tool.function?.description?.replace('[MCP]', '').trim() || 
+            mcpServerTools = loadedTools.map((tool: any) => {
+                const rawName = tool.function?.name || tool.name || '';
+                const toolName = rawName.replace('mcp_', '');
+                const description = tool.function?.description?.replace('[MCP]', '').trim() ||
                                    tool.description || 'No description';
-                
+
                 // 检查是否已允许
-                const isAllowed = currentAllowedTools.length === 0 || 
-                                 currentAllowedTools.includes(toolName);
-                
+                const isAllowed = selectedMcpServer.allowTools.includes(toolName);
+
                 return {
                     name: toolName,
                     description: description,
@@ -297,44 +371,58 @@
                 };
             }).sort((a, b) => a.name.localeCompare(b.name));
 
+            console.log('[Settings] Final tools:', mcpServerTools);
+
         } catch (err) {
-            mcpToolsError = err instanceof Error ? err.message : 'Unknown error';
             console.error('[Settings] MCP fetch error:', err);
+            mcpServerToolsError = err instanceof Error ? err.message : 'Unknown error';
         } finally {
-            mcpToolsLoading = false;
+            mcpServerToolsLoading = false;
         }
     }
 
     // 切换工具选择
-    function toggleMcpTool(name: string) {
-        mcpToolsList = mcpToolsList.map(tool => 
+    function toggleMcpServerTool(name: string) {
+        mcpServerTools = mcpServerTools.map(tool =>
             tool.name === name ? { ...tool, selected: !tool.selected } : tool
         );
     }
 
     // 全选
-    function selectAllMcpTools() {
-        mcpToolsList = mcpToolsList.map(tool => ({ ...tool, selected: true }));
+    function selectAllMcpServerTools() {
+        mcpServerTools = mcpServerTools.map(tool => ({ ...tool, selected: true }));
     }
 
     // 取消全选
-    function deselectAllMcpTools() {
-        mcpToolsList = mcpToolsList.map(tool => ({ ...tool, selected: false }));
+    function deselectAllMcpServerTools() {
+        mcpServerTools = mcpServerTools.map(tool => ({ ...tool, selected: false }));
     }
 
-    // 保存工具选择
-    async function saveMcpTools() {
-        const selectedTools = mcpToolsList
+    // 保存工具选择到 Server
+    async function saveMcpServerTools() {
+        if (!selectedMcpServer) return;
+
+        const selectedTools = mcpServerTools
             .filter(t => t.selected)
             .map(t => t.name);
-        
+
         settings = {
             ...settings,
-            mcpAllowTools: selectedTools.join(', ')
+            mcpServers: settings.mcpServers.map(s =>
+                s.id === selectedMcpServerId
+                    ? { ...s, allowTools: selectedTools }
+                    : s
+            ),
         };
 
         await saveSettings();
-        pushMsg(t('settings.mcp.fetchTools.saved') || '已保存工具选择');
+        pushMsg('工具选择已保存');
+    }
+
+    // 保存 Server 配置
+    async function saveMcpServerConfig() {
+        await saveSettings();
+        pushMsg('配置已保存');
     }
 
     let groups: ISettingGroup[] = [
@@ -484,64 +572,7 @@
         },
         {
             name: t('settings.settingsGroup.mcp') || 'MCP (Model Context Protocol)',
-            items: [
-                {
-                    key: 'mcpEnabled',
-                    value: settings.mcpEnabled,
-                    type: 'checkbox',  // 修复：用 checkbox 而不是 switch
-                    title: t('settings.mcp.enabled.title') || '启用 MCP',
-                    description:
-                        t('settings.mcp.enabled.description') ||
-                        '启用 MCP 支持后可连接外部 MCP Server 获取更多工具',
-                },
-                {
-                    key: 'mcpServerUrl',
-                    value: settings.mcpServerUrl,
-                    type: 'textinput',
-                    title: t('settings.mcp.serverUrl.title') || 'MCP Server URL',
-                    description:
-                        t('settings.mcp.serverUrl.description') ||
-                        'MCP Server 的 HTTP 端点地址，如 https://mcp.example.com',
-                    placeholder: 'https://mcp.example.com',
-                },
-                {
-                    key: 'mcpAuthToken',
-                    value: settings.mcpAuthToken,
-                    type: 'textinput',
-                    title: t('settings.mcp.authToken.title') || '认证 Token',
-                    description:
-                        t('settings.mcp.authToken.description') ||
-                        'MCP Server 的认证 Token（可选）',
-                    placeholder: 'Bearer token...',
-                },
-                {
-                    key: 'mcpTimeoutMs',
-                    value: settings.mcpTimeoutMs,
-                    type: 'number',
-                    title: t('settings.mcp.timeout.title') || '调用超时',
-                    description:
-                        t('settings.mcp.timeout.description') ||
-                        'MCP 工具调用超时时间（毫秒），默认 20000',
-                    number: {
-                        min: 1000,
-                        max: 120000,
-                        step: 1000,
-                    },
-                },
-                {
-                    key: 'mcpFetchTools',
-                    value: '',
-                    type: 'button',
-                    title: t('settings.mcp.fetchTools.title') || '拉取工具列表',
-                    description:
-                        t('settings.mcp.fetchTools.description') ||
-                        '连接 MCP Server 并获取可用工具列表，勾选要启用的工具',
-                    button: {
-                        label: t('settings.mcp.fetchTools.button') || '拉取工具列表',
-                        callback: fetchMcpTools,
-                    },
-                },
-            ],
+            items: [], // 使用自定义渲染
         },
         {
             name: t('settings.settingsGroup.translate') || '翻译设置',
@@ -1020,68 +1051,195 @@
                 {/if}
             </div>
         {:else if focusGroup === (t('settings.settingsGroup.mcp') || 'MCP (Model Context Protocol)')}
-            <div class="mcp-management-panel">
-                <SettingPanel
-                    group={currentGroup?.name || ''}
-                    settingItems={currentGroup?.items?.filter(item => item.key !== 'mcpToolsSelector') || []}
-                    display={true}
-                    on:changed={onChanged}
-                />
-                
-                <!-- 内联工具选择器 -->
-                {#if mcpToolsLoading || mcpToolsError || mcpToolsList.length > 0}
-                    <div class="mcp-tools-section">
-                        <div class="mcp-tools-header">
-                            <span class="mcp-server-info">{mcpServerInfo || 'MCP Server'}</span>
-                            <span class="mcp-selection-count">{selectedMcpToolsCount} / {mcpToolsList.length} 已选择</span>
+            <div class="platform-management-layout">
+                <!-- 左侧：Server 列表 -->
+                <aside class="platform-sidebar">
+                    <div class="unified-platform-manager">
+                        <div class="manager-header">
+                            <h5>MCP Servers</h5>
+                            <button 
+                                class="b3-button b3-button--outline b3-button--small"
+                                on:click={() => showAddMcpServer = !showAddMcpServer}
+                            >
+                                {showAddMcpServer ? '取消' : '+ 添加'}
+                            </button>
                         </div>
                         
-                        {#if mcpToolsLoading}
-                            <div class="mcp-loading">
-                                <div class="mcp-spinner"></div>
-                                <span>正在连接并获取工具列表...</span>
-                            </div>
-                        {:else if mcpToolsError}
-                            <div class="mcp-error">
-                                <p>获取工具失败: {mcpToolsError}</p>
-                                <button class="b3-button" on:click={fetchMcpTools}>重试</button>
-                            </div>
-                        {:else if mcpToolsList.length > 0}
-                            <div class="mcp-tools-controls">
-                                <input 
-                                    type="text" 
-                                    class="b3-text-field"
-                                    placeholder="搜索工具..."
-                                    bind:value={mcpToolsSearchQuery}
-                                />
-                                <button class="b3-button b3-button--outline" on:click={selectAllMcpTools}>全选</button>
-                                <button class="b3-button b3-button--outline" on:click={deselectAllMcpTools}>取消全选</button>
-                            </div>
-                            
-                            <div class="mcp-tools-list">
-                                {#each filteredMcpTools as tool (tool.name)}
-                                    <label class="mcp-tool-item" class:selected={tool.selected}>
-                                        <input 
-                                            type="checkbox" 
-                                            checked={tool.selected}
-                                            on:change={() => toggleMcpTool(tool.name)}
-                                        />
-                                        <div class="mcp-tool-info">
-                                            <span class="mcp-tool-name">{tool.name}</span>
-                                            <span class="mcp-tool-desc">{tool.description}</span>
-                                        </div>
-                                    </label>
-                                {/each}
-                            </div>
-                            
-                            <div class="mcp-tools-footer">
-                                <button class="b3-button b3-button--text" on:click={saveMcpTools}>
-                                    保存选择 ({selectedMcpToolsCount})
+                        {#if showAddMcpServer}
+                            <div class="add-platform-form">
+                                <div class="fn__flex" style="gap: 8px;">
+                                    <input
+                                        class="b3-text-field fn__flex-1"
+                                        type="text"
+                                        bind:value={newMcpServerName}
+                                        placeholder="Server 名称"
+                                    />
+                                    <input
+                                        class="b3-text-field fn__flex-1"
+                                        type="text"
+                                        bind:value={newMcpServerUrl}
+                                        placeholder="https://mcp.example.com"
+                                    />
+                                </div>
+                                <button
+                                    class="b3-button b3-button--outline"
+                                    on:click={addMcpServer}
+                                    disabled={!newMcpServerName.trim() || !newMcpServerUrl.trim()}
+                                >
+                                    添加
                                 </button>
                             </div>
                         {/if}
+                        
+                        <div class="platform-list">
+                            {#each settings.mcpServers || [] as server (server.id)}
+                                <div
+                                    class="platform-item"
+                                    class:platform-item--selected={selectedMcpServerId === server.id}
+                                    on:click={() => { selectedMcpServerId = server.id; mcpServerTools = []; }}
+                                >
+                                    <div class="platform-item__info">
+                                        <span class="platform-item__name">{server.name}</span>
+                                        <span class="platform-item__type">
+                                            {server.enabled ? '已启用' : '已禁用'}
+                                        </span>
+                                    </div>
+                                    <button
+                                        class="b3-button b3-button--text b3-button--error"
+                                        on:click|stopPropagation={() => removeMcpServer(server.id)}
+                                        title="删除"
+                                    >
+                                        <svg class="b3-button__icon" style="width: 16px; height: 16px;">
+                                            <use xlink:href="#iconTrashcan"></use>
+                                        </svg>
+                                    </button>
+                                </div>
+                            {/each}
+                        </div>
                     </div>
-                {/if}
+                </aside>
+                
+                <!-- 右侧：Server 配置详情 -->
+                <main class="platform-main">
+                    {#if selectedMcpServer}
+                        <div class="provider-config">
+                            <div class="provider-config__header">
+                                <h4>{selectedMcpServer.name}</h4>
+                            </div>
+                            
+                            <!-- 启用开关 -->
+                            <div class="provider-config__section">
+                                <label class="fn__flex" style="align-items: center; gap: 12px; cursor: pointer;">
+                                    <input 
+                                        type="checkbox" 
+                                        class="b3-switch"
+                                        bind:checked={selectedMcpServer.enabled}
+                                        on:change={saveMcpServerConfig}
+                                    />
+                                    <span class="b3-label__text" style="margin: 0;">启用此 Server</span>
+                                </label>
+                            </div>
+                            
+                            <!-- 基本配置 -->
+                            <div class="provider-config__section">
+                                <div class="config-item">
+                                    <div class="b3-label__text">Server URL</div>
+                                    <input 
+                                        class="b3-text-field fn__block"
+                                        type="text"
+                                        bind:value={selectedMcpServer.url}
+                                        on:change={saveMcpServerConfig}
+                                        placeholder="https://mcp.example.com"
+                                    />
+                                </div>
+                                
+                                <div class="config-item" style="margin-top: 16px;">
+                                    <div class="b3-label__text">认证 Token（可选）</div>
+                                    <input 
+                                        class="b3-text-field fn__block"
+                                        type="password"
+                                        bind:value={selectedMcpServer.authToken}
+                                        on:change={saveMcpServerConfig}
+                                        placeholder="Bearer token"
+                                    />
+                                </div>
+                                
+                                <div class="config-item" style="margin-top: 16px;">
+                                    <div class="b3-label__text">调用超时（毫秒）</div>
+                                    <input 
+                                        class="b3-text-field fn__block"
+                                        type="number"
+                                        bind:value={selectedMcpServer.timeoutMs}
+                                        on:change={saveMcpServerConfig}
+                                        min="1000"
+                                        max="120000"
+                                        step="1000"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <!-- 工具管理 -->
+                            <div class="provider-config__section" style="margin-top: 24px;">
+                                <div class="section-header">
+                                    <div class="b3-label__text" style="font-size: 14px; font-weight: 500; margin: 0;">工具管理</div>
+                                    <button 
+                                        class="b3-button b3-button--outline" 
+                                        on:click={fetchMcpServerTools}
+                                        disabled={mcpServerToolsLoading}
+                                    >
+                                        拉取工具
+                                    </button>
+                                </div>
+                                
+                                {#if mcpServerToolsError}
+                                    <div class="b3-label__text" style="color: var(--b3-theme-error); margin-top: 12px;">
+                                        {mcpServerToolsError}
+                                    </div>
+                                {:else if mcpServerTools.length > 0}
+                                    <div class="tools-search-row" style="margin-top: 16px;">
+                                        <input 
+                                            class="b3-text-field fn__flex-1" 
+                                            placeholder="搜索工具..."
+                                            bind:value={mcpToolsSearchQuery}
+                                        />
+                                        <button class="b3-button b3-button--outline" on:click={selectAllMcpServerTools}>全选</button>
+                                        <button class="b3-button b3-button--outline" on:click={deselectAllMcpServerTools}>取消全选</button>
+                                    </div>
+                                    
+                                    <div class="b3-label__text" style="margin-top: 16px; margin-bottom: 12px;">已启用的工具</div>
+                                    
+                                    <div class="tools-list-container">
+                                        {#each filteredMcpServerTools as tool, index}
+                                            <label class="tool-list-item" class:tool-list-item--last={index === filteredMcpServerTools.length - 1}>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={tool.selected}
+                                                    on:change={() => toggleMcpServerTool(tool.name)}
+                                                />
+                                                <div class="tool-list-item__content">
+                                                    <div class="tool-list-item__name">{tool.name}</div>
+                                                    <div class="tool-list-item__desc">{tool.description}</div>
+                                                </div>
+                                            </label>
+                                        {/each}
+                                    </div>
+                                    
+                                    <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+                                        <button class="b3-button b3-button--text" on:click={saveMcpServerTools}>
+                                            保存选择 ({selectedMcpToolsCount})
+                                        </button>
+                                    </div>
+                                {:else}
+                                    <div class="empty-tools-hint">
+                                        点击"拉取工具"获取可用工具列表
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
+                    {:else}
+                        <div class="no-selection">请选择一个 MCP Server 或添加新 Server</div>
+                    {/if}
+                </main>
             </div>
         {:else}
             <SettingPanel
@@ -1340,56 +1498,35 @@
         color: var(--b3-theme-on-surface-light);
     }
 
-    .mcp-loading {
+    .config-item {
+        margin-bottom: 0;
+    }
+
+    .section-header {
         display: flex;
-        flex-direction: column;
+        justify-content: space-between;
         align-items: center;
-        padding: 32px;
-        gap: 12px;
+        margin-bottom: 12px;
     }
 
-    .mcp-spinner {
-        width: 24px;
-        height: 24px;
-        border: 2px solid var(--b3-theme-background-light);
-        border-top-color: var(--b3-theme-primary);
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-
-    .mcp-error {
-        padding: 20px;
-        text-align: center;
-        color: var(--b3-theme-error);
-    }
-
-    .mcp-tools-controls {
+    .tools-search-row {
         display: flex;
         gap: 8px;
-        margin-bottom: 12px;
-
-        .b3-text-field {
-            flex: 1;
-        }
+        align-items: center;
     }
 
-    .mcp-tools-list {
-        max-height: 300px;
-        overflow-y: auto;
+    .tools-list-container {
         border: 1px solid var(--b3-border-color);
-        border-radius: 4px;
+        border-radius: 6px;
+        overflow: hidden;
         background: var(--b3-theme-background);
     }
 
-    .mcp-tool-item {
+    .tool-list-item {
         display: flex;
         align-items: flex-start;
-        gap: 10px;
-        padding: 12px;
+        gap: 12px;
+        padding: 12px 16px;
         border-bottom: 1px solid var(--b3-border-color);
         cursor: pointer;
         transition: background 0.15s;
@@ -1398,44 +1535,42 @@
             background: var(--b3-theme-background-light);
         }
 
-        &.selected {
-            background: rgba(30, 128, 255, 0.08);
+        &--last {
+            border-bottom: none;
         }
 
         input[type="checkbox"] {
-            margin-top: 3px;
+            margin-top: 2px;
             width: 16px;
             height: 16px;
+            flex-shrink: 0;
         }
     }
 
-    .mcp-tool-info {
+    .tool-list-item__content {
         flex: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
         min-width: 0;
     }
 
-    .mcp-tool-name {
+    .tool-list-item__name {
         font-weight: 500;
-        font-size: 13px;
+        font-size: 14px;
         color: var(--b3-theme-on-background);
+        margin-bottom: 4px;
     }
 
-    .mcp-tool-desc {
+    .tool-list-item__desc {
         font-size: 12px;
         color: var(--b3-theme-on-surface-light);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        line-height: 1.5;
     }
 
-    .mcp-tools-footer {
-        display: flex;
-        justify-content: flex-end;
-        margin-top: 12px;
-        padding-top: 12px;
-        border-top: 1px solid var(--b3-border-color);
+    .empty-tools-hint {
+        color: var(--b3-theme-on-surface-light);
+        text-align: center;
+        padding: 40px 20px;
+        background: var(--b3-theme-background);
+        border-radius: 6px;
+        font-size: 13px;
     }
 </style>

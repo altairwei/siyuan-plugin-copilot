@@ -198,8 +198,13 @@ export async function getMcpTools(config: McpConfig): Promise<
         };
     }>
 > {
+    console.log('[MCP] ====================');
+    console.log('[MCP] getMcpTools called');
+    console.log('[MCP] config:', JSON.stringify(config, null, 2));
+    
     // Check if MCP is enabled
     if (!config.enabled) {
+        console.log('[MCP] ❌ MCP not enabled');
         return [];
     }
 
@@ -208,54 +213,84 @@ export async function getMcpTools(config: McpConfig): Promise<
 
     // Try to get from cache first
     const cachedTools = mcpToolCache.getTools();
+    console.log('[MCP] Cached tools:', cachedTools ? cachedTools.length : 'null');
+    
     if (cachedTools) {
-        console.log("[MCP] Using cached tools:", cachedTools.length);
+        console.log('[MCP] Using cached tools:', cachedTools.length);
+        console.log('[MCP] Cached tool names:', cachedTools.map(t => t.name));
         
         // Filter cached tools based on allowTools/denyTools config
         let filteredTools = cachedTools;
+        console.log('[MCP] allowTools config:', config.allowTools);
+        
         if (config.allowTools && config.allowTools.length > 0) {
-            filteredTools = filteredTools.filter(tool => config.allowTools.includes(tool.name));
+            console.log('[MCP] Filtering by allowTools...');
+            filteredTools = filteredTools.filter(tool => {
+                const included = config.allowTools.includes(tool.name);
+                console.log(`[MCP]   Tool ${tool.name}: ${included ? '✓' : '✗'}`);
+                return included;
+            });
+        } else {
+            console.log('[MCP] allowTools is empty, allowing all');
         }
+        
         if (config.denyTools && config.denyTools.length > 0) {
             filteredTools = filteredTools.filter(tool => !config.denyTools.includes(tool.name));
         }
         
-        console.log("[MCP] Filtered cached tools:", filteredTools.length);
+        console.log('[MCP] Filtered cached tools:', filteredTools.length);
+        console.log('[MCP] ====================');
         return filteredTools.map((tool, index) => mcpToolToCopilotTool(tool, index));
     }
 
     // Connect to MCP server
     try {
+        console.log('[MCP] Connecting to MCP server...');
         await mcpClient.connect(config);
+        console.log('[MCP] ✅ Connected');
 
         // Get tools list
+        console.log('[MCP] Fetching tools list...');
         const tools = await mcpClient.listTools();
+        console.log('[MCP] Raw tools from server:', tools.length, tools.map(t => t.name));
 
         // Cache the tools (store all tools from server)
         mcpToolCache.setTools(tools);
 
         // Disconnect after getting tools (MVP: don't keep persistent connection)
         mcpClient.disconnect();
+        console.log('[MCP] Disconnected');
 
         // Filter tools based on allowTools config
         // If allowTools is empty, allow all; otherwise only allow listed tools
         let filteredTools = tools;
+        console.log('[MCP] allowTools for filtering:', config.allowTools);
+        
         if (config.allowTools && config.allowTools.length > 0) {
-            filteredTools = tools.filter(tool => config.allowTools.includes(tool.name));
-            console.log("[MCP] Filtered tools by allowlist:", filteredTools.length, "of", tools.length);
+            console.log('[MCP] Filtering by allowTools...');
+            filteredTools = tools.filter(tool => {
+                const included = config.allowTools.includes(tool.name);
+                console.log(`[MCP]   Tool ${tool.name}: ${included ? '✓' : '✗'}`);
+                return included;
+            });
+            console.log('[MCP] Filtered tools by allowlist:', filteredTools.length, "of", tools.length);
+        } else {
+            console.log('[MCP] allowTools is empty, allowing all tools');
         }
 
         // Also filter by denyTools
         if (config.denyTools && config.denyTools.length > 0) {
             filteredTools = filteredTools.filter(tool => !config.denyTools.includes(tool.name));
-            console.log("[MCP] Filtered tools by denylist:", filteredTools.length, "remaining");
+            console.log('[MCP] Filtered tools by denylist:', filteredTools.length, "remaining");
         }
 
-        console.log("[MCP] Loaded tools:", filteredTools.length);
+        console.log('[MCP] Final tools to return:', filteredTools.length);
+        console.log('[MCP] ====================');
         return filteredTools.map((tool, index) => mcpToolToCopilotTool(tool, index));
     } catch (error) {
-        console.error("[MCP] Failed to load tools:", error);
+        console.error('[MCP] ❌ Failed to load tools:', error);
         mcpClient.disconnect();
+        console.log('[MCP] ====================');
         return [];
     }
 }

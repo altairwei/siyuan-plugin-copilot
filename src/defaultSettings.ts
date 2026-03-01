@@ -208,20 +208,17 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
 
     // MCP (Model Context Protocol) 设置
     mcpEnabled: false as boolean, // 启用 MCP
-    mcpServerUrl: '' as string, // MCP Server URL
-    mcpAuthToken: '' as string, // MCP Auth Token
-    mcpTimeoutMs: 20000 as number, // MCP 调用超时（毫秒）
-    mcpMaxArgChars: 12000 as number, // MCP 参数最大字符数（KB）
-    mcpAllowTools: '' as string, // MCP 允许的工具列表（逗号分隔，空=全部允许）
-    mcpDenyTools: '' as string, // MCP 拒绝的工具列表（逗号分隔）
-    mcpRefreshOnStart: true as boolean, // 启动时刷新工具列表
-
-    // 数据迁移标志
-    dataTransfer: {
-        sessionData: false,
-        autoSetModelCapabilities: false, // 是否已自动设置模型能力
-    },
-
+    mcpServers: [] as Array<{
+        id: string;
+        name: string;
+        url: string;
+        authToken: string;
+        timeoutMs: number;
+        maxArgChars: number;
+        enabled: boolean;
+        allowTools: string[];
+    }>, // MCP Server 列表
+    
     // 保留旧设置以便兼容升级
     aiProvider: 'openai',
     aiApiKey: '',
