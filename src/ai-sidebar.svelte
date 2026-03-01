@@ -4075,9 +4075,11 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
 
         messagesToSend = [...systemMessages, ...limitedMessagesWithToolFix];
 
-        // 加载 MCP 工具（如果启用）
+        // 加载 MCP 工具（从所有启用的 MCP 服务器）
         let mcpTools: any[] = [];
-        if (settings.mcpEnabled && settings.mcpServerUrl) {
+        const mcpServers = (settings as any).mcpServers || [];
+        const hasEnabledMcpServers = mcpServers.some((s: any) => s.enabled && s.url && s.allowTools?.length > 0);
+        if (hasEnabledMcpServers) {
             try {
                 const { loadMcpTools } = await import('./mcp');
                 mcpTools = await loadMcpTools(settings);
@@ -4110,54 +4112,38 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                 toolsForAgent = AVAILABLE_TOOLS.filter(tool =>
                     selectedTools.some(t => t.name === tool.function.name)
                 );
-                
-                console.log('[DEBUG] Built-in tools selected:', toolsForAgent.length);
-                toolsForAgent.forEach((tool, idx) => {
-                    console.log(`[DEBUG] Built-in tool ${idx}:`, tool.function.name, 'type:', typeof tool, 'has function:', !!tool.function);
-                });
-                
-                // 合并 MCP 工具（如果已加载且用户允许）
-                if (mcpTools.length > 0) {
-                    console.log('[Sidebar] Merging MCP tools into toolsForAgent:', mcpTools.length);
-                    // 过滤掉无效的工具对象
-                    const validMcpTools = mcpTools.filter((tool: any, index: number) => {
-                        console.log(`[DEBUG] Checking MCP tool ${index}:`, tool?.function?.name || 'unknown');
-                        if (!tool || typeof tool !== 'object') {
-                            console.warn('[Sidebar] Invalid MCP tool (not an object):', tool);
-                            return false;
+
+                // 合并 MCP 工具
+                // 找出用户选中的 MCP 工具名
+                const selectedMcpToolNames = selectedTools
+                    .filter(t => t.name.startsWith('mcp_'))
+                    .map(t => t.name);
+
+                if (selectedMcpToolNames.length > 0) {
+                    // 优先使用已加载的完整 MCP 工具定义
+                    const mcpToolMap = new Map(
+                        mcpTools.map((t: any) => [t.function?.name, t])
+                    );
+
+                    for (const mcpName of selectedMcpToolNames) {
+                        const fullTool = mcpToolMap.get(mcpName);
+                        if (fullTool?.function?.name && fullTool?.function?.parameters) {
+                            // 使用包含完整参数 schema 的工具定义
+                            toolsForAgent.push(fullTool);
+                        } else {
+                            // 回退：构建基本的工具定义，AI 仍可调用
+                            const rawName = mcpName.replace('mcp_', '');
+                            toolsForAgent.push({
+                                type: 'function',
+                                function: {
+                                    name: mcpName,
+                                    description: `[MCP] ${rawName}`,
+                                    parameters: { type: 'object', properties: {}, required: [] },
+                                },
+                            });
                         }
-                        if (!tool.function || typeof tool.function !== 'object') {
-                            console.warn('[Sidebar] Invalid MCP tool (missing function):', tool);
-                            return false;
-                        }
-                        if (!tool.function.name || typeof tool.function.name !== 'string') {
-                            console.warn('[Sidebar] Invalid MCP tool (missing function.name):', tool);
-                            return false;
-                        }
-                        if (!tool.function.parameters || typeof tool.function.parameters !== 'object') {
-                            console.warn('[Sidebar] Invalid MCP tool (missing function.parameters):', tool);
-                            return false;
-                        }
-                        console.log(`[DEBUG] MCP tool ${index} is valid:`, tool.function.name);
-                        return true;
-                    });
-                    console.log('[Sidebar] Valid MCP tools after filtering:', validMcpTools.length);
-                    
-                    // DEBUG: 显示合并前的总工具数
-                    console.log('[DEBUG] Before merge - toolsForAgent length:', toolsForAgent.length);
-                    toolsForAgent = [...toolsForAgent, ...validMcpTools];
-                    console.log('[DEBUG] After merge - toolsForAgent length:', toolsForAgent.length);
-                    
-                    // DEBUG: 验证每个工具
-                    toolsForAgent.forEach((tool, idx) => {
-                        const isValid = tool && typeof tool === 'object' && 
-                                       tool.function && typeof tool.function === 'object' &&
-                                       tool.function.name && tool.function.parameters;
-                        console.log(`[DEBUG] Final tool ${idx}:`, tool?.function?.name || 'unknown', 'valid:', isValid);
-                        if (!isValid) {
-                            console.error('[DEBUG] INVALID TOOL at index', idx, ':', JSON.stringify(tool));
-                        }
-                    });
+                    }
+                    console.log('[Sidebar] MCP tools merged:', selectedMcpToolNames.length);
                 }
             }
 

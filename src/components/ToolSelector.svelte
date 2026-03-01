@@ -31,68 +31,55 @@
         localSelectedTools = [...selectedTools];
     }
 
-    // 组件挂载时加载 MCP 工具
-    onMount(async () => {
-        await loadMcpTools();
+    // 组件挂载时从已保存的设置中构建 MCP 工具列表（无需连接服务器）
+    onMount(() => {
+        loadMcpToolsFromSettings();
     });
 
-    // 加载 MCP 工具
-    async function loadMcpTools() {
-        console.log('[ToolSelector] ====================');
-        console.log('[ToolSelector] loadMcpTools called');
-        
-        // 从 store 获取设置
+    // MCP 工具按服务器分组
+    interface McpServerGroup {
+        serverName: string;
+        tools: Tool[];
+    }
+    let mcpServerGroups: McpServerGroup[] = [];
+
+    // 从 settings.mcpServers 的 allowTools 直接构建工具列表（无需连接）
+    function loadMcpToolsFromSettings() {
         let settings: any;
         settingsStore.subscribe(s => { settings = s; })();
-        
-        console.log('[ToolSelector] settings from store:', settings);
-        console.log('[ToolSelector] settings.mcpEnabled:', settings?.mcpEnabled);
-        console.log('[ToolSelector] settings.mcpAllowTools:', settings?.mcpAllowTools);
-        
-        if (!settings?.mcpEnabled) {
-            console.log('[ToolSelector] ❌ MCP not enabled');
-            return;
+
+        const mcpServers = settings?.mcpServers || [];
+        const allTools: Tool[] = [];
+        const groups: McpServerGroup[] = [];
+
+        for (const server of mcpServers) {
+            if (!server.enabled || !server.url) continue;
+            if (!server.allowTools || server.allowTools.length === 0) continue;
+
+            const serverTools: Tool[] = [];
+            for (const toolName of server.allowTools) {
+                const tool: Tool = {
+                    type: 'function',
+                    function: {
+                        name: `mcp_${toolName}`,
+                        description: `[MCP] ${server.name} - ${toolName}`,
+                        parameters: {
+                            type: 'object',
+                            properties: {},
+                            required: [],
+                        },
+                    },
+                };
+                serverTools.push(tool);
+                allTools.push(tool);
+            }
+
+            groups.push({ serverName: server.name, tools: serverTools });
         }
 
-        try {
-            const { getMcpTools, refreshMcpTools } = await import('../mcp/mcpTools');
-            console.log('[ToolSelector] MCP module loaded');
-            
-            mcpToolsLoading = true;
-            
-            const rawAllowTools = settings.mcpAllowTools || '';
-            const parsedAllowTools = rawAllowTools.split(',').map((t: string) => t.trim()).filter((t: string) => t);
-            console.log('[ToolSelector] Raw mcpAllowTools:', rawAllowTools);
-            console.log('[ToolSelector] Parsed allowTools:', parsedAllowTools);
-            
-            const config = {
-                enabled: settings.mcpEnabled,
-                serverUrl: settings.mcpServerUrl,
-                authToken: settings.mcpAuthToken || '',
-                transport: 'http' as const,
-                timeoutMs: settings.mcpTimeoutMs || 20000,
-                maxArgChars: settings.mcpMaxArgChars || 12000,
-                allowTools: parsedAllowTools,
-                denyTools: [],
-                refreshToolsOnStart: true,
-            };
-
-            console.log('[ToolSelector] MCP config:', JSON.stringify(config, null, 2));
-            
-            refreshMcpTools();
-            
-            const tools = await getMcpTools(config);
-            mcpTools = tools;
-            
-            console.log('[ToolSelector] ✅ Loaded MCP tools:', tools.length);
-            console.log('[ToolSelector] Tools:', tools.map((t: any) => t.function?.name));
-        } catch (error) {
-            console.error('[ToolSelector] ❌ Failed to load MCP tools:', error);
-            mcpTools = [];
-        } finally {
-            mcpToolsLoading = false;
-            console.log('[ToolSelector] ====================');
-        }
+        mcpTools = allTools;
+        mcpServerGroups = groups;
+        console.log('[ToolSelector] MCP tools from settings:', allTools.length, 'servers:', groups.length);
     }
 
     function close() {
@@ -346,14 +333,13 @@
             </div>
         {/each}
 
-        <!-- MCP 工具分类 -->
-        {#if mcpTools.length > 0}
+        <!-- MCP 工具按服务器分组 -->
+        {#each mcpServerGroups as group (group.serverName)}
             <div class="tool-category">
-                <h4 class="tool-category__title">MCP Server</h4>
+                <h4 class="tool-category__title">MCP: {group.serverName}</h4>
                 <div class="tool-list">
-                    {#each mcpTools as tool (tool.function.name)}
+                    {#each group.tools as tool (tool.function.name)}
                         {@const toolName = tool.function.name}
-                        {@const isExpanded = expandedTools.has(toolName)}
 
                         <div
                             class="tool-item"
@@ -385,55 +371,13 @@
                                             {t('tools.autoApprove.label')}
                                         </span>
                                     </label>
-                                    <button
-                                        class="tool-item__expand b3-button b3-button--text"
-                                        on:click={() => toggleExpand(toolName)}
-                                        title={isExpanded
-                                            ? t('common.collapse')
-                                            : t('common.expand')}
-                                    >
-                                        <svg
-                                            class="svg"
-                                            class:tool-item__expand--rotated={isExpanded}
-                                        >
-                                            <use xlink:href="#iconRight"></use>
-                                        </svg>
-                                    </button>
                                 </div>
                             </div>
-
-                            <div class="tool-item__description">
-                                {getToolShortDescription(tool)}
-                            </div>
-
-                            {#if isExpanded}
-                                <div class="tool-item__details">
-                                    <pre class="tool-item__full-description">{tool.function
-                                            .description}</pre>
-
-                                    <div class="tool-item__parameters">
-                                        <strong>{t('tools.selector.parameters')}:</strong>
-                                        <ul>
-                                            {#each Object.entries(tool.function.parameters.properties) as [paramName, param]}
-                                                <li>
-                                                    <code>{paramName}</code>
-                                                    {#if tool.function.parameters.required.includes(paramName)}
-                                                        <span class="tool-item__required">
-                                                            ({t('common.required')})
-                                                        </span>
-                                                    {/if}
-                                                    : {param.description}
-                                                </li>
-                                            {/each}
-                                        </ul>
-                                    </div>
-                                </div>
-                            {/if}
                         </div>
                     {/each}
                 </div>
             </div>
-        {/if}
+        {/each}
     </div>
 
     <div class="tool-selector__footer">
