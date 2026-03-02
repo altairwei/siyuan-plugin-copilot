@@ -39,6 +39,8 @@ import {
 import { getActiveEditor } from 'siyuan';
 import { webSearch, formatSearchResults, WebSearchResponse } from './webSearch';
 import { webFetch, formatFetchResult, WebFetchResponse, WebFetchConfig } from './webFetch';
+import { invokeMcpTool } from '../mcp';
+import { getSettings, settingsStore } from '../stores/settings';
 
 /**
  * 获取当前激活的编辑器 Protyle 实例
@@ -1780,14 +1782,26 @@ export async function siyuan_set_block_attrs(id: string, attrs: { [key: string]:
 }
 
 /**
+ * 同步获取最新设置（优先 settingsStore，后备 window 全局变量）
+ */
+function getCurrentSettings(): any {
+    let storeSettings: any = null;
+    // settingsStore.subscribe 同步返回当前值
+    settingsStore.subscribe(s => { storeSettings = s; })();
+    if (storeSettings && Object.keys(storeSettings).length > 0) {
+        return storeSettings;
+    }
+    return (window as any).__siyuanCopilotSettings || {};
+}
+
+/**
  * 获取 Brave Search API 配置
  */
 export function getBraveSearchConfig(): BraveSearchConfig {
-    // 从 window 上的全局变量获取设置（由 ai-sidebar.svelte 设置）
-    const settings = (window as any).__siyuanCopilotSettings || {};
+    const settings = getCurrentSettings();
     const apiKey = settings?.braveSearchApiKey || '';
     const baseUrl = settings?.braveSearchBaseUrl || '';
-    
+
     return {
         apiKey,
         baseUrl: baseUrl || undefined
@@ -1798,11 +1812,10 @@ export function getBraveSearchConfig(): BraveSearchConfig {
  * 获取 Web Fetch 配置
  */
 export function getWebFetchConfig(): WebFetchConfig {
-    // 从 window 上的全局变量获取设置
-    const settings = (window as any).__siyuanCopilotSettings || {};
+    const settings = getCurrentSettings();
     const httpProxy = settings?.braveSearchHttpProxy || '';
     const socksProxy = settings?.braveSearchSocksProxy || '';
-    
+
     return {
         httpProxy: httpProxy || undefined,
         socksProxy: socksProxy || undefined,
@@ -1973,6 +1986,19 @@ export async function executeToolCall(toolCall: ToolCall): Promise<string> {
 
     try {
         const args = JSON.parse(argsStr);
+
+        // MCP 工具调用 - 以 mcp_ 前缀开头
+        if (name.startsWith('mcp_')) {
+            const settings = await getSettings();
+            console.log('[Tools] MCP tool call:', name);
+            const mcpResult = await invokeMcpTool(name, args, settings);
+            if (!mcpResult.success) {
+                throw new Error(mcpResult.error || 'MCP tool call failed');
+            }
+            return typeof mcpResult.result === 'string' 
+                ? mcpResult.result 
+                : JSON.stringify(mcpResult.result, null, 2);
+        }
 
         switch (name) {
             case 'web_search':

@@ -4075,6 +4075,20 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
 
         messagesToSend = [...systemMessages, ...limitedMessagesWithToolFix];
 
+        // 加载 MCP 工具（从所有启用的 MCP 服务器）
+        let mcpTools: any[] = [];
+        const mcpServers = (settings as any).mcpServers || [];
+        const hasEnabledMcpServers = mcpServers.some((s: any) => s.enabled && s.url && s.allowTools?.length > 0);
+        if (hasEnabledMcpServers) {
+            try {
+                const { loadMcpTools } = await import('./mcp');
+                mcpTools = await loadMcpTools(settings);
+                console.log('[Sidebar] Loaded MCP tools:', mcpTools.length);
+            } catch (error) {
+                console.error('[Sidebar] Failed to load MCP tools:', error);
+            }
+        }
+
         // 创建新的 AbortController
         abortController = new AbortController();
 
@@ -4085,11 +4099,52 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
 
             // 准备 Agent 模式的工具列表
             let toolsForAgent: any[] | undefined = undefined;
+            
+            // DEBUG: 始终显示 MCP 工具状态
+            console.log('[DEBUG] === MCP Tools Status ===');
+            console.log('[DEBUG] mcpEnabled:', settings.mcpEnabled);
+            console.log('[DEBUG] mcpTools loaded:', mcpTools.length);
+            console.log('[DEBUG] chatMode:', chatMode);
+            console.log('[DEBUG] selectedTools:', selectedTools.length);
+            
             if (chatMode === 'agent' && selectedTools.length > 0) {
                 // 根据选中的工具名称筛选出对应的工具定义
                 toolsForAgent = AVAILABLE_TOOLS.filter(tool =>
                     selectedTools.some(t => t.name === tool.function.name)
                 );
+
+                // 合并 MCP 工具
+                // 找出用户选中的 MCP 工具名
+                const selectedMcpToolNames = selectedTools
+                    .filter(t => t.name.startsWith('mcp_'))
+                    .map(t => t.name);
+
+                if (selectedMcpToolNames.length > 0) {
+                    // 优先使用已加载的完整 MCP 工具定义
+                    const mcpToolMap = new Map(
+                        mcpTools.map((t: any) => [t.function?.name, t])
+                    );
+
+                    for (const mcpName of selectedMcpToolNames) {
+                        const fullTool = mcpToolMap.get(mcpName);
+                        if (fullTool?.function?.name && fullTool?.function?.parameters) {
+                            // 使用包含完整参数 schema 的工具定义
+                            toolsForAgent.push(fullTool);
+                        } else {
+                            // 回退：构建基本的工具定义，AI 仍可调用
+                            const rawName = mcpName.replace('mcp_', '');
+                            toolsForAgent.push({
+                                type: 'function',
+                                function: {
+                                    name: mcpName,
+                                    description: `[MCP] ${rawName}`,
+                                    parameters: { type: 'object', properties: {}, required: [] },
+                                },
+                            });
+                        }
+                    }
+                    console.log('[Sidebar] MCP tools merged:', selectedMcpToolNames.length);
+                }
             }
 
             // 准备联网搜索工具（如果启用）
@@ -7878,6 +7933,18 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
 
     // 获取工具的显示名称
     function getToolDisplayName(toolName: string): string {
+        if (!toolName) return '未知工具';
+        
+        // MCP 工具：移除 mcp_ 前缀，转换为友好名称
+        if (toolName.startsWith('mcp_')) {
+            const mcpName = toolName.slice(4);
+            // 将下划线分隔转换为标题格式
+            return mcpName.split('_').map(word => 
+                word.charAt(0).toUpperCase() + word.slice(1)
+            ).join(' ');
+        }
+        
+        // 内置工具：尝试 i18n 翻译
         const key = `tools.${toolName}.name`;
         const name = t(key);
         return name === key ? toolName : name;
@@ -11433,7 +11500,7 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
 
     <!-- 工具选择器对话框 -->
     {#if isToolSelectorOpen}
-        <ToolSelector bind:selectedTools on:close={() => (isToolSelectorOpen = false)} />
+        <ToolSelector bind:selectedTools {plugin} on:close={() => (isToolSelectorOpen = false)} />
     {/if}
 
     <!-- 保存到笔记对话框 -->

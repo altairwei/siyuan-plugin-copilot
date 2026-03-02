@@ -1910,6 +1910,43 @@ export default class PluginSample extends Plugin {
 
         // 迁移：自动为已有模型设置能力
         try {
+            // MCP Server 迁移：从单 Server 到多 Server
+            if (!settings.mcpServers || settings.mcpServers.length === 0) {
+                // 检查是否有旧的单 Server 配置
+                if (settings.mcpServerUrl) {
+                    settings.mcpServers = [{
+                        id: `mcp_${Date.now()}`,
+                        name: 'Default MCP Server',
+                        url: settings.mcpServerUrl,
+                        authToken: settings.mcpAuthToken || '',
+                        timeoutMs: settings.mcpTimeoutMs || 20000,
+                        maxArgChars: settings.mcpMaxArgChars || 12000,
+                        enabled: settings.mcpEnabled || false,
+                        allowTools: (settings.mcpAllowTools || '').split(',').map((t: string) => t.trim()).filter((t: string) => t),
+                    }];
+                    
+                    // 清理旧字段
+                    delete settings.mcpServerUrl;
+                    delete settings.mcpAuthToken;
+                    delete settings.mcpTimeoutMs;
+                    delete settings.mcpMaxArgChars;
+                    delete settings.mcpAllowTools;
+                    delete settings.mcpDenyTools;
+                    delete settings.mcpRefreshOnStart;
+                    
+                    await this.saveData(SETTINGS_FILE, settings);
+                    pushMsg('MCP Server 配置已迁移为多 Server 模式');
+                } else {
+                    // 初始化空数组
+                    settings.mcpServers = [];
+                }
+            }
+        } catch (e) {
+            console.error('MCP Server migration failed:', e);
+        }
+
+        // 迁移：自动为已有模型设置能力
+        try {
             // 检查是否已经执行过迁移
             if (!settings.dataTransfer) {
                 settings.dataTransfer = {};

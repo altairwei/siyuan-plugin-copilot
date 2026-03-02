@@ -2,15 +2,43 @@
     import { onMount } from 'svelte';
     import SettingPanel from '@/libs/components/setting-panel.svelte';
     import { t } from './utils/i18n';
-    import { getDefaultSettings } from './defaultSettings';
+    import { getDefaultSettings, BUILT_IN_MCP_SERVERS } from './defaultSettings';
     import { pushMsg, pushErrMsg, lsNotebooks } from './api';
     import { confirm } from 'siyuan';
     import ProviderConfigPanel from './components/ProviderConfigPanel.svelte';
-    import type { CustomProviderConfig } from './defaultSettings';
+    import type { CustomProviderConfig, BuiltInMcpServer } from './defaultSettings';
     export let plugin;
 
     // 使用动态默认设置
     let settings = { ...getDefaultSettings() };
+
+    // MCP 多 Server 管理状态
+    let selectedMcpServerId = '';
+    let showAddMcpServer = false;
+    let newMcpServerName = '';
+    let newMcpServerUrl = '';
+    
+    // 当前选中 Server 的工具列表
+    let mcpServerTools: Array<{name: string, description: string, selected: boolean}> = [];
+    let mcpServerToolsLoading = false;
+    let mcpServerToolsError = '';
+    let showMcpAuthToken = false;
+    let mcpToolsSearchQuery = '';
+    let showMcpToolsList = true; // 控制工具列表折叠/展开
+
+    // 获取当前选中的 Server
+    $: selectedMcpServer = settings.mcpServers?.find(s => s.id === selectedMcpServerId);
+    
+    // 过滤后的工具列表
+    $: filteredMcpServerTools = mcpServerTools.filter(tool => {
+        if (!mcpToolsSearchQuery) return true;
+        const query = mcpToolsSearchQuery.toLowerCase();
+        return tool.name.toLowerCase().includes(query) || 
+               tool.description.toLowerCase().includes(query);
+    });
+    
+    // 选中的工具数量
+    $: selectedMcpToolsCount = mcpServerTools.filter(t => t.selected).length;
 
     // 笔记本列表
     let notebookOptions: Record<string, string> = {};
@@ -49,6 +77,27 @@
         openai: 'https://platform.openai.com/',
         volcano: 'https://console.volcengine.com/ark',
     };
+
+    // 内置 MCP Server 名称映射
+    const builtInMcpServerNames: Record<string, string> = {
+        github: 'GitHub',
+    };
+
+    // 内置 MCP Server 的官网链接（获取 Token 的帮助页面）
+    const builtInMcpServerWebsites: Record<string, string> = {
+        github: 'https://github.com/settings/tokens?type=pat',
+    };
+
+    // 获取内置 MCP Server 的网站链接
+    function getMcpServerWebsite(serverName: string): string | undefined {
+        // 通过 name 查找对应的 key
+        for (const [key, name] of Object.entries(builtInMcpServerNames)) {
+            if (name === serverName) {
+                return builtInMcpServerWebsites[key];
+            }
+        }
+        return undefined;
+    }
 
     // 当前选中的平台ID
     let selectedProviderId = '';
@@ -217,6 +266,16 @@
         return customProvider?.name || t('platform.unknown');
     })();
 
+    // 获取所有 MCP Server 选项（内置+自定义）
+    $: allMcpServerOptions = (() => {
+        // 从 settings.mcpServers 中获取所有服务器，判断是内置还是自定义
+        return (settings.mcpServers || []).map(s => ({
+            id: s.id,
+            name: s.name,
+            type: Object.values(builtInMcpServerNames).includes(s.name) ? 'built-in' as const : 'custom' as const,
+        }));
+    })();
+
     // 保存选中的平台ID（仅在设置面板中选择平台，不影响对话中的当前平台）
     function handleProviderSelect() {
         // 使用响应式更新确保 Svelte 检测到变化
@@ -225,6 +284,225 @@
             selectedProviderId: selectedProviderId,
         };
         saveSettings();
+    }
+
+    // ==================== MCP 多 Server 管理 ====================
+
+    // 生成唯一 ID
+    function generateMcpServerId(): string {
+        return `mcp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    // 添加 MCP Server
+    function addMcpServer() {
+        if (!newMcpServerName.trim()) {
+            pushErrMsg('请填写 Server 名称');
+            return;
+        }
+
+        const newServer = {
+            id: generateMcpServerId(),
+            name: newMcpServerName.trim(),
+            url: '', // URL 可后续在详情页面填写
+            authToken: '',
+            timeoutMs: 20000,
+            maxArgChars: 12000,
+            enabled: true,
+            allowTools: [],
+        };
+
+        settings = {
+            ...settings,
+            mcpServers: [...(settings.mcpServers || []), newServer],
+        };
+
+        selectedMcpServerId = newServer.id;
+        newMcpServerName = '';
+        newMcpServerUrl = '';
+        showAddMcpServer = false;
+        mcpServerTools = [];
+
+        saveSettings();
+        pushMsg('MCP Server 已添加');
+    }
+
+    // 添加内置 MCP Server
+    function addBuiltInMcpServer(server: BuiltInMcpServer) {
+        const newServer = {
+            id: generateMcpServerId(),
+            name: server.name,
+            url: server.url,
+            authToken: '', // 用户需要自行填写 token
+            timeoutMs: 20000,
+            maxArgChars: 12000,
+            enabled: true,
+            allowTools: server.defaultTools,
+        };
+
+        settings = {
+            ...settings,
+            mcpServers: [...(settings.mcpServers || []), newServer],
+        };
+
+        selectedMcpServerId = newServer.id;
+        mcpServerTools = [];
+        saveSettings();
+        pushMsg(`${server.name} Server 已添加，请填写认证 Token`);
+    }
+
+    // 删除 MCP Server
+    function removeMcpServer(serverId: string) {
+        const server = settings.mcpServers?.find(s => s.id === serverId);
+        if (!server) return;
+
+        // 检查是否是内置服务器
+        const isBuiltIn = Object.values(builtInMcpServerNames).includes(server.name);
+
+        confirm(
+            isBuiltIn ? '重置 MCP Server' : '删除 MCP Server',
+            isBuiltIn
+                ? `确定要重置 "${server.name}" 吗？这将清除所有配置（如 Token）。`
+                : `确定要删除 "${server.name}" 吗？`,
+            () => {
+                if (isBuiltIn) {
+                    // 内置服务器：清除配置但保留条目
+                    settings = {
+                        ...settings,
+                        mcpServers: settings.mcpServers.map(s =>
+                            s.id === serverId
+                                ? {
+                                      ...s,
+                                      authToken: '',
+                                      enabled: true,
+                                      allowTools: BUILT_IN_MCP_SERVERS[Object.keys(builtInMcpServerNames).find(k => builtInMcpServerNames[k] === s.name)]?.defaultTools || [],
+                                  }
+                                : s
+                        ),
+                    };
+                } else {
+                    // 自定义服务器：删除条目
+                    settings = {
+                        ...settings,
+                        mcpServers: settings.mcpServers.filter(s => s.id !== serverId),
+                    };
+                }
+
+                if (selectedMcpServerId === serverId) {
+                    selectedMcpServerId = '';
+                    mcpServerTools = [];
+                }
+
+                saveSettings();
+                pushMsg(isBuiltIn ? 'MCP Server 已重置' : 'MCP Server 已删除');
+            }
+        );
+    }
+
+    // 拉取 MCP Server 工具列表
+    async function fetchMcpServerTools() {
+        if (!selectedMcpServer) return;
+
+        console.log('[Settings] fetchMcpServerTools called');
+        console.log('[Settings] Server:', selectedMcpServer);
+
+        mcpServerToolsLoading = true;
+        mcpServerToolsError = '';
+
+        try {
+            const { getMcpTools, refreshMcpTools } = await import('./mcp/mcpTools');
+
+            // 构建单服务器的 McpConfig，allowTools 为空以获取所有工具
+            const config = {
+                enabled: true,
+                serverUrl: selectedMcpServer.url,
+                authToken: selectedMcpServer.authToken || '',
+                transport: 'http' as const,
+                timeoutMs: selectedMcpServer.timeoutMs || 20000,
+                maxArgChars: selectedMcpServer.maxArgChars || 12000,
+                allowTools: [] as string[], // 空 = 获取所有工具用于展示
+                denyTools: [] as string[],
+                refreshToolsOnStart: true,
+            };
+
+            // 刷新缓存以确保获取最新工具列表
+            refreshMcpTools();
+
+            // 直接加载该服务器的所有工具
+            const loadedTools = await getMcpTools(config);
+            console.log('[Settings] Loaded tools:', loadedTools.length);
+
+            // 转换为本地格式
+            mcpServerTools = loadedTools.map((tool: any) => {
+                const rawName = tool.function?.name || tool.name || '';
+                const toolName = rawName.replace('mcp_', '');
+                const description = tool.function?.description?.replace('[MCP]', '').trim() ||
+                                   tool.description || 'No description';
+
+                // 检查是否已允许
+                const isAllowed = selectedMcpServer.allowTools.includes(toolName);
+
+                return {
+                    name: toolName,
+                    description: description,
+                    selected: isAllowed
+                };
+            }).sort((a, b) => a.name.localeCompare(b.name));
+
+            console.log('[Settings] Final tools:', mcpServerTools);
+
+        } catch (err) {
+            console.error('[Settings] MCP fetch error:', err);
+            mcpServerToolsError = err instanceof Error ? err.message : 'Unknown error';
+        } finally {
+            mcpServerToolsLoading = false;
+        }
+    }
+
+    // 切换工具选择（自动保存）
+    function toggleMcpServerTool(name: string) {
+        mcpServerTools = mcpServerTools.map(tool =>
+            tool.name === name ? { ...tool, selected: !tool.selected } : tool
+        );
+        saveMcpServerTools();
+    }
+
+    // 全选（自动保存）
+    function selectAllMcpServerTools() {
+        mcpServerTools = mcpServerTools.map(tool => ({ ...tool, selected: true }));
+        saveMcpServerTools();
+    }
+
+    // 取消全选（自动保存）
+    function deselectAllMcpServerTools() {
+        mcpServerTools = mcpServerTools.map(tool => ({ ...tool, selected: false }));
+        saveMcpServerTools();
+    }
+
+    // 保存工具选择到 Server
+    async function saveMcpServerTools() {
+        if (!selectedMcpServer) return;
+
+        const selectedTools = mcpServerTools
+            .filter(t => t.selected)
+            .map(t => t.name);
+
+        settings = {
+            ...settings,
+            mcpServers: settings.mcpServers.map(s =>
+                s.id === selectedMcpServerId
+                    ? { ...s, allowTools: selectedTools }
+                    : s
+            ),
+        };
+
+        await saveSettings();
+        pushMsg('工具选择已保存');
+    }
+
+    // 保存 Server 配置
+    async function saveMcpServerConfig() {
+        await saveSettings();
+        pushMsg('配置已保存');
     }
 
     let groups: ISettingGroup[] = [
@@ -371,6 +649,10 @@
                     placeholder: 'https://api.search.brave.com/res/v1',
                 },
             ],
+        },
+        {
+            name: t('settings.settingsGroup.mcp') || 'MCP (Model Context Protocol)',
+            items: [], // 使用自定义渲染
         },
         {
             name: t('settings.settingsGroup.translate') || '翻译设置',
@@ -526,6 +808,26 @@
         // 确保 customProviders 数组存在
         if (!settings.aiProviders.customProviders) {
             settings.aiProviders.customProviders = [];
+        }
+
+        // 确保每个内置 MCP Server 都存在（自动添加）
+        if (!settings.mcpServers) {
+            settings.mcpServers = [];
+        }
+        for (const [id, server] of Object.entries(BUILT_IN_MCP_SERVERS)) {
+            const exists = settings.mcpServers.some(s => s.name === server.name);
+            if (!exists) {
+                settings.mcpServers.push({
+                    id: generateMcpServerId(),
+                    name: server.name,
+                    url: server.url,
+                    authToken: '',
+                    timeoutMs: 20000,
+                    maxArgChars: 12000,
+                    enabled: true,
+                    allowTools: server.defaultTools,
+                });
+            }
         }
 
         // 恢复选中的平台ID（仅用于设置面板显示）
@@ -848,6 +1150,257 @@
                     </div>
                 {/if}
             </div>
+        {:else if focusGroup === (t('settings.settingsGroup.mcp') || 'MCP (Model Context Protocol)')}
+            <div class="platform-management-layout">
+                <!-- 左侧：Server 列表 -->
+                <aside class="platform-sidebar">
+                    <div class="unified-platform-manager">
+                        <div class="manager-header">
+                            <h5>MCP Servers</h5>
+                            <button
+                                class="b3-button b3-button--outline"
+                                on:click={() => showAddMcpServer = !showAddMcpServer}
+                            >
+                                {showAddMcpServer ? '取消' : '+ 添加'}
+                            </button>
+                        </div>
+
+                        <!-- 添加自定义 Server 表单 -->
+                        {#if showAddMcpServer}
+                            <div class="add-platform-form">
+                                <input
+                                    class="b3-text-field"
+                                    style="width: 100%;"
+                                    type="text"
+                                    bind:value={newMcpServerName}
+                                    placeholder="Server 名称"
+                                    on:keydown={e => e.key === 'Enter' && newMcpServerName.trim() && addMcpServer()}
+                                />
+                                <button
+                                    class="b3-button b3-button--outline"
+                                    on:click={addMcpServer}
+                                    disabled={!newMcpServerName.trim()}
+                                >
+                                    添加
+                                </button>
+                            </div>
+                        {/if}
+
+                        <!-- Server 列表（内置 + 自定义） -->
+                        <div class="platform-list">
+                            {#each allMcpServerOptions as server (server.id)}
+                                <div
+                                    class="platform-item"
+                                    class:platform-item--selected={selectedMcpServerId === server.id}
+                                    on:click={() => {
+                                        selectedMcpServerId = server.id;
+                                        mcpServerTools = [];
+                                    }}
+                                    on:keydown={e => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            selectedMcpServerId = server.id;
+                                            mcpServerTools = [];
+                                        }
+                                    }}
+                                    role="button"
+                                    tabindex="0"
+                                >
+                                    <div class="platform-item__info">
+                                        <span class="platform-item__name">{server.name}</span>
+                                        <span class="platform-item__type">
+                                            {server.type === 'built-in' ? '内置' : '自定义'}
+                                        </span>
+                                    </div>
+                                    <button
+                                        class="b3-button b3-button--text b3-button--error"
+                                        on:click|stopPropagation={() => {
+                                            // 找到对应的 server id 进行删除
+                                            const toRemove = settings.mcpServers?.find(s => s.name === server.name);
+                                            if (toRemove) {
+                                                removeMcpServer(toRemove.id);
+                                            }
+                                        }}
+                                        title="删除"
+                                    >
+                                        <svg class="b3-button__icon" style="width: 16px; height: 16px;">
+                                            <use xlink:href="#iconTrashcan"></use>
+                                        </svg>
+                                    </button>
+                                </div>
+                            {/each}
+                            {#if allMcpServerOptions.length === 0}
+                                <div class="empty-hint">暂无可用 MCP Server</div>
+                            {/if}
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- 右侧：Server 配置详情 -->
+                <main class="platform-main">
+                    {#if selectedMcpServer}
+                        <div class="provider-config">
+                            <div class="provider-config__header">
+                                <h4>{selectedMcpServer.name}</h4>
+                                {#if getMcpServerWebsite(selectedMcpServer.name)}
+                                    <a
+                                        class="platform-link"
+                                        href={getMcpServerWebsite(selectedMcpServer.name)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        title="访问平台"
+                                    >
+                                        <svg class="b3-button__icon">
+                                            <use xlink:href="#iconLink"></use>
+                                        </svg>
+                                        <span>访问平台</span>
+                                    </a>
+                                {/if}
+                            </div>
+                            
+                            <!-- 启用开关 -->
+                            <div class="provider-config__section">
+                                <label class="fn__flex" style="align-items: center; gap: 12px; cursor: pointer;">
+                                    <input 
+                                        type="checkbox" 
+                                        class="b3-switch"
+                                        bind:checked={selectedMcpServer.enabled}
+                                        on:change={saveMcpServerConfig}
+                                    />
+                                    <span class="b3-label__text" style="margin: 0;">启用此 Server</span>
+                                </label>
+                            </div>
+                            <!-- 基本配置 -->
+                            <div class="provider-config__section">
+                                <!-- 仅自定义服务器显示 URL 字段 -->
+                                {#if !getMcpServerWebsite(selectedMcpServer.name)}
+                                <div class="config-item">
+                                    <div class="b3-label__text">Server URL</div>
+                                    <input
+                                        class="b3-text-field fn__block"
+                                        type="text"
+                                        bind:value={selectedMcpServer.url}
+                                        on:change={saveMcpServerConfig}
+                                        placeholder="https://mcp.example.com"
+                                    />
+                                </div>
+                                {/if}
+
+                                <div class="config-item" style="margin-top: 16px;">
+                                    <div class="b3-label__text">认证 Token（可选）</div>
+                                    <div class="api-key-input-wrapper">
+                                        {#if showMcpAuthToken}
+                                            <input
+                                                class="b3-text-field fn__flex-1"
+                                                type="text"
+                                                bind:value={selectedMcpServer.authToken}
+                                                on:change={saveMcpServerConfig}
+                                                placeholder="Bearer token"
+                                            />
+                                        {:else}
+                                            <input
+                                                class="b3-text-field fn__flex-1"
+                                                type="password"
+                                                bind:value={selectedMcpServer.authToken}
+                                                on:change={saveMcpServerConfig}
+                                                placeholder="Bearer token"
+                                            />
+                                        {/if}
+                                        <button
+                                            class="b3-button b3-button--text api-key-toggle"
+                                            on:click={() => (showMcpAuthToken = !showMcpAuthToken)}
+                                        >
+                                            <svg class="b3-button__icon">
+                                                <use xlink:href={showMcpAuthToken ? '#iconEye' : '#iconEyeoff'}></use>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="config-item" style="margin-top: 16px;">
+                                    <div class="b3-label__text">调用超时（毫秒）</div>
+                                    <input 
+                                        class="b3-text-field fn__block"
+                                        type="number"
+                                        bind:value={selectedMcpServer.timeoutMs}
+                                        on:change={saveMcpServerConfig}
+                                        min="1000"
+                                        max="120000"
+                                        step="1000"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <!-- 工具管理 -->
+                            <div class="provider-config__section" style="margin-top: 24px;">
+                                <div class="section-header">
+                                    <h5>工具管理</h5>
+                                    <button
+                                        class="b3-button b3-button--outline"
+                                        on:click={fetchMcpServerTools}
+                                        disabled={mcpServerToolsLoading}
+                                    >
+                                        拉取工具
+                                    </button>
+                                </div>
+                                
+                                {#if mcpServerToolsError}
+                                    <div class="b3-label__text" style="color: var(--b3-theme-error); margin-top: 12px;">
+                                        {mcpServerToolsError}
+                                    </div>
+                                {:else if mcpServerTools.length > 0}
+                                    <div class="tools-search-row" style="margin-top: 16px;">
+                                        <input 
+                                            class="b3-text-field fn__flex-1" 
+                                            placeholder="搜索工具..."
+                                            bind:value={mcpToolsSearchQuery}
+                                        />
+                                        <button class="b3-button b3-button--outline" on:click={selectAllMcpServerTools}>全选</button>
+                                        <button class="b3-button b3-button--outline" on:click={deselectAllMcpServerTools}>取消全选</button>
+                                    </div>
+                                    
+                                    <div class="tools-list-header">
+                                        <button
+                                            class="tools-list-toggle"
+                                            on:click={() => showMcpToolsList = !showMcpToolsList}
+                                        >
+                                            <svg class="b3-button__icon">
+                                                <use
+                                                    xlink:href={showMcpToolsList ? '#iconDown' : '#iconRight'}
+                                                ></use>
+                                            </svg>
+                                            <span>已启用工具 ({selectedMcpToolsCount})</span>
+                                        </button>
+                                    </div>
+
+                                    {#if showMcpToolsList}
+                                    <div class="tools-list-container">
+                                        {#each filteredMcpServerTools as tool, index}
+                                            <label class="tool-list-item" class:tool-list-item--last={index === filteredMcpServerTools.length - 1}>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={tool.selected}
+                                                    on:change={() => toggleMcpServerTool(tool.name)}
+                                                />
+                                                <div class="tool-list-item__content">
+                                                    <div class="tool-list-item__name">{tool.name}</div>
+                                                    <div class="tool-list-item__desc">{tool.description}</div>
+                                                </div>
+                                            </label>
+                                        {/each}
+                                    </div>
+                                    {/if}
+                                {:else}
+                                    <div class="empty-tools-hint">
+                                        点击"拉取工具"获取可用工具列表
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
+                    {:else}
+                        <div class="no-selection">请选择一个 MCP Server 或添加新 Server</div>
+                    {/if}
+                </main>
+            </div>
         {:else}
             <SettingPanel
                 group={currentGroup?.name || ''}
@@ -910,6 +1463,8 @@
         border: 1px dashed var(--b3-border-color);
         border-radius: 6px;
         color: var(--b3-theme-on-surface-light);
+        text-align: center;
+        margin: auto;
     }
 
     .unified-platform-manager {
@@ -1006,6 +1561,66 @@
         font-size: 13px;
     }
 
+    /* 内置 MCP Servers */
+    .builtin-servers {
+        padding: 12px;
+        background: var(--b3-theme-background);
+        border-radius: 6px;
+        margin-bottom: 12px;
+    }
+
+    .builtin-servers-header {
+        font-size: 11px;
+        color: var(--b3-theme-on-surface-light);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .builtin-server-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        padding: 8px 12px;
+        background: var(--b3-theme-surface);
+        border: 1px solid var(--b3-border-color);
+        border-radius: 6px;
+        margin-bottom: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:last-child {
+            margin-bottom: 0;
+        }
+
+        &:hover:not(:disabled) {
+            border-color: var(--b3-theme-primary);
+            background: var(--b3-theme-primary-lightest);
+        }
+
+        &:disabled {
+            cursor: default;
+            opacity: 0.6;
+        }
+
+        &--added {
+            border-color: var(--b3-theme-primary);
+            background: var(--b3-theme-primary-lightest);
+        }
+    }
+
+    .builtin-server-name {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--b3-theme-on-surface);
+    }
+
+    .builtin-server-status {
+        font-size: 11px;
+        color: var(--b3-theme-primary);
+    }
+
     .session-management-panel {
         display: flex;
         flex-direction: column;
@@ -1069,5 +1684,224 @@
                 opacity: 0.6;
             }
         }
+    }
+
+    /* Provider Config 样式（用于 MCP 设置等） */
+    .provider-config {
+        padding: 16px;
+        background: var(--b3-theme-surface);
+        border-radius: 6px;
+        height: 100%;
+        overflow-y: auto;
+    }
+
+    .provider-config__header {
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        h4 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--b3-theme-on-background);
+        }
+    }
+
+    .provider-config__section {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .platform-link {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        font-size: 12px;
+        color: var(--b3-theme-primary);
+        text-decoration: none;
+        border-radius: 4px;
+        transition: all 0.2s;
+
+        &:hover {
+            background: var(--b3-theme-primary-lightest);
+            color: var(--b3-theme-primary);
+        }
+
+        svg {
+            width: 14px;
+            height: 14px;
+        }
+    }
+
+    /* MCP 工具管理 */
+    .mcp-management-panel {
+        padding: 16px;
+        overflow-y: auto;
+    }
+
+    .mcp-tools-section {
+        margin-top: 16px;
+        padding: 16px;
+        background: var(--b3-theme-surface);
+        border-radius: 6px;
+        border: 1px solid var(--b3-border-color);
+    }
+
+    .mcp-tools-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--b3-border-color);
+    }
+
+    .mcp-server-info {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--b3-theme-on-surface);
+    }
+
+    .mcp-selection-count {
+        font-size: 12px;
+        color: var(--b3-theme-on-surface-light);
+    }
+
+    .config-item {
+        margin-bottom: 0;
+    }
+
+    .api-key-input-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        width: 100%;
+    }
+
+    .api-key-toggle {
+        flex-shrink: 0;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+
+        &:hover {
+            opacity: 1;
+        }
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+
+        h5 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--b3-theme-on-surface);
+        }
+    }
+
+    .tools-search-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .tools-list-header {
+        margin-top: 16px;
+        margin-bottom: 12px;
+    }
+
+    .tools-list-toggle {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 0;
+        width: 100%;
+        justify-content: flex-start;
+        color: var(--b3-theme-on-surface);
+        font-size: 14px;
+        font-weight: 500;
+        background: none;
+        border: none;
+        cursor: pointer;
+        transition: color 0.2s;
+
+        &:hover {
+            color: var(--b3-theme-on-background);
+        }
+
+        .b3-button__icon {
+            width: 14px;
+            height: 14px;
+        }
+    }
+
+    .tools-list-container {
+        border: 1px solid var(--b3-border-color);
+        border-radius: 6px;
+        overflow: hidden;
+        background: var(--b3-theme-background);
+    }
+
+    .tool-list-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--b3-border-color);
+        cursor: pointer;
+        transition: background 0.15s;
+        margin-bottom: 0;
+
+        &:hover {
+            background: var(--b3-theme-background-light);
+        }
+
+        &--last {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        input[type="checkbox"] {
+            margin-top: 2px;
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+    }
+
+    .tool-list-item__content {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .tool-list-item__name {
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--b3-theme-on-background);
+    }
+
+    .tool-list-item__desc {
+        font-size: 12px;
+        color: var(--b3-theme-on-surface);
+        line-height: 1.5;
+    }
+
+    .empty-tools-hint {
+        color: var(--b3-theme-on-surface-light);
+        text-align: center;
+        padding: 40px 20px;
+        background: var(--b3-theme-background);
+        border-radius: 6px;
+        font-size: 13px;
     }
 </style>

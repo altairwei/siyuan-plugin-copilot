@@ -6,25 +6,86 @@
 </script>
 
 <script lang="ts">
-    import { createEventDispatcher } from 'svelte';
+    import { createEventDispatcher, onMount } from 'svelte';
     import { AVAILABLE_TOOLS, type Tool } from '../tools';
     import { t } from '../utils/i18n';
+    import { settingsStore } from '../stores/settings';
 
     export let selectedTools: ToolConfig[] = [];
+    export let plugin: any = null;
 
     const dispatch = createEventDispatcher();
 
     // 使用本地状态管理选中工具，避免双向绑定的问题
     let localSelectedTools: ToolConfig[] = [...selectedTools];
 
+    // MCP 工具列表
+    let mcpTools: Tool[] = [];
+    let mcpToolsLoading = false;
+
+    // 监听 mcpTools 变化
+    $: console.log('[ToolSelector] mcpTools changed:', mcpTools.length, mcpTools);
+
     // 当外部 selectedTools 改变时，同步到本地状态
     $: if (selectedTools) {
         localSelectedTools = [...selectedTools];
     }
 
+    // 组件挂载时从已保存的设置中构建 MCP 工具列表（无需连接服务器）
+    onMount(() => {
+        loadMcpToolsFromSettings();
+    });
+
+    // MCP 工具按服务器分组
+    interface McpServerGroup {
+        serverName: string;
+        tools: Tool[];
+    }
+    let mcpServerGroups: McpServerGroup[] = [];
+
+    // 从 settings.mcpServers 的 allowTools 直接构建工具列表（无需连接）
+    function loadMcpToolsFromSettings() {
+        let settings: any;
+        settingsStore.subscribe(s => { settings = s; })();
+
+        const mcpServers = settings?.mcpServers || [];
+        const allTools: Tool[] = [];
+        const groups: McpServerGroup[] = [];
+
+        for (const server of mcpServers) {
+            if (!server.enabled || !server.url) continue;
+            if (!server.allowTools || server.allowTools.length === 0) continue;
+
+            const serverTools: Tool[] = [];
+            for (const toolName of server.allowTools) {
+                const tool: Tool = {
+                    type: 'function',
+                    function: {
+                        name: `mcp_${toolName}`,
+                        description: `[MCP] ${server.name} - ${toolName}`,
+                        parameters: {
+                            type: 'object',
+                            properties: {},
+                            required: [],
+                        },
+                    },
+                };
+                serverTools.push(tool);
+                allTools.push(tool);
+            }
+
+            groups.push({ serverName: server.name, tools: serverTools });
+        }
+
+        mcpTools = allTools;
+        mcpServerGroups = groups;
+        console.log('[ToolSelector] MCP tools from settings:', allTools.length, 'servers:', groups.length);
+    }
+
     function close() {
         dispatch('close');
     }
+
     const toolCategories = {
         siyuan: {
             name: t('tools.category.siyuan'),
@@ -62,6 +123,9 @@
             .filter(tool => tool !== undefined) as Tool[];
     }
 
+    // 所有可用工具（内置 + MCP）
+    $: allAvailableTools = [...AVAILABLE_TOOLS, ...mcpTools];
+
     // 切换工具选择
     function toggleTool(toolName: string) {
         const index = localSelectedTools.findIndex(t => t.name === toolName);
@@ -98,12 +162,12 @@
 
     // 全选/取消全选
     function toggleAll() {
-        if (localSelectedTools.length === AVAILABLE_TOOLS.length) {
+        if (localSelectedTools.length === allAvailableTools.length) {
             // 取消全选
             localSelectedTools = [];
         } else {
             // 全选
-            localSelectedTools = AVAILABLE_TOOLS.map(tool => ({
+            localSelectedTools = allAvailableTools.map(tool => ({
                 name: tool.function.name,
                 autoApprove: false,
             }));
@@ -133,7 +197,10 @@
     function getToolDisplayName(toolName: string): string {
         const key = `tools.${toolName}.name`;
         const name = t(key);
-        // 如果 i18n 找不到翻译，返回原始工具名
+        // 如果 i18n 找不到翻译，返回原始工具名（去掉 mcp_ 前缀）
+        if (!name && toolName.startsWith('mcp_')) {
+            return toolName.replace('mcp_', '');
+        }
         return name || toolName;
     }
 
@@ -265,6 +332,52 @@
                 </div>
             </div>
         {/each}
+
+        <!-- MCP 工具按服务器分组 -->
+        {#each mcpServerGroups as group (group.serverName)}
+            <div class="tool-category">
+                <h4 class="tool-category__title">MCP: {group.serverName}</h4>
+                <div class="tool-list">
+                    {#each group.tools as tool (tool.function.name)}
+                        {@const toolName = tool.function.name}
+
+                        <div
+                            class="tool-item"
+                            class:tool-item--selected={selectedSet.has(toolName)}
+                        >
+                            <div class="tool-item__header">
+                                <label class="tool-item__checkbox">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedSet.has(toolName)}
+                                        on:change={() => toggleTool(toolName)}
+                                    />
+                                    <span class="tool-item__name">
+                                        {getToolDisplayName(toolName)}
+                                    </span>
+                                </label>
+                                <div class="tool-item__header-right">
+                                    <label
+                                        class="tool-item__auto-approve"
+                                        title={t('tools.autoApprove.tooltip')}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            class="b3-switch"
+                                            checked={autoApproveMap.get(toolName) || false}
+                                            on:change={() => toggleToolAutoApprove(toolName)}
+                                        />
+                                        <span class="tool-item__auto-approve-text">
+                                            {t('tools.autoApprove.label')}
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    {/each}
+                </div>
+            </div>
+        {/each}
     </div>
 
     <div class="tool-selector__footer">
@@ -275,7 +388,7 @@
             </div>
         </div>
         <span class="tool-selector__count">
-            {t('tools.selector.selected')}: {localSelectedTools.length}/{AVAILABLE_TOOLS.length}
+            {t('tools.selector.selected')}: {localSelectedTools.length}/{allAvailableTools.length}
         </span>
     </div>
 </div>
