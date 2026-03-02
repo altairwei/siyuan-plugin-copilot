@@ -1487,9 +1487,8 @@
     }
 
     .no-selection {
-        padding: 24px;
+        padding: 16px;
         background: var(--b3-theme-background);
-        border: 1px dashed var(--b3-border-color);
         border-radius: 6px;
         color: var(--b3-theme-on-surface-light);
         text-align: left;
@@ -1959,7 +1958,7 @@
             padding: 12px 16px;
             background: var(--b3-theme-surface);
             border-radius: 4px;
-            margin-top: 8px;
+            margin-top: 4px;
             overflow: hidden;
 
             ol, ul {

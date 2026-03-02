@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs basename:*)",
+      "WebFetch(domain:docs.siyuan-note.club)",
+      "Bash(curl:*)",
+      "Bash(pnpm install:*)",
+      "Bash(npx:*)",
+      "Bash(cp:*)",
+      "WebFetch(domain:github.com)",
+      "WebSearch",
+      "Bash(xargs grep:*)",
+      "Bash(npm install:*)",
+      "Bash(cross-env NODE_ENV=development:*)",
+      "Bash(pnpm run:*)",
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(node:*)"
+    ]
+  }
+}
