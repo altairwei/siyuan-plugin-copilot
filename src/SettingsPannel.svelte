@@ -1955,7 +1955,7 @@
         }
 
         &-content {
-            padding: 12px 16px;
+            padding: 8px 12px;
             background: var(--b3-theme-surface);
             border-radius: 4px;
             margin-top: 4px;
