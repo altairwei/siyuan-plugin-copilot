@@ -1403,7 +1403,30 @@
                             </div>
                         </div>
                     {:else}
-                        <div class="no-selection">请选择一个 MCP Server 或添加新 Server</div>
+                        <div class="no-selection">
+                            <p>请选择一个 MCP Server 或添加新 Server</p>
+                            <details class="mcp-guide">
+                                <summary>如何开通联网搜索 MCP？</summary>
+                                <div class="mcp-guide-content">
+                                    <ol>
+                                        <li>
+                                            进入百炼的 <a href="https://bailian.console.aliyun.com/cn-beijing/?tab=app#/mcp-market" target="_blank">MCP 广场</a>，找到<strong>联网搜索</strong> MCP 服务。
+                                        </li>
+                                        <li>
+                                            单击<strong>立即开通</strong> &gt; <strong>确认开通</strong>。
+                                            <p class="tip">联网搜索、网页抓取等 MCP 服务<strong>限时免费</strong>，每月 2000 次免费额度。</p>
+                                        </li>
+                                        <li>
+                                            开通成功后，在 MCP 广场获取配置信息：
+                                            <ul>
+                                                <li><strong>Streamable HTTP Endpoint</strong>：<code>https://dashscope.aliyuncs.com/api/v1/mcps/WebSearch/mcp</code></li>
+                                                <li><strong>API Key</strong>：即百炼 API Key</li>
+                                            </ul>
+                                        </li>
+                                    </ol>
+                                </div>
+                            </details>
+                        </div>
                     {/if}
                 </main>
             </div>
@@ -1909,5 +1932,61 @@
         background: var(--b3-theme-background);
         border-radius: 6px;
         font-size: 13px;
+    }
+
+    .mcp-guide {
+        margin-top: 16px;
+        text-align: left;
+        font-size: 13px;
+
+        summary {
+            cursor: pointer;
+            color: var(--b3-theme-primary);
+            font-weight: 500;
+            padding: 8px 0;
+
+            &:hover {
+                color: var(--b3-theme-primary-light);
+            }
+        }
+
+        &-content {
+            padding: 12px 16px;
+            background: var(--b3-theme-surface);
+            border-radius: 4px;
+            margin-top: 8px;
+
+            ol, ul {
+                padding-left: 20px;
+                margin: 8px 0;
+            }
+
+            li {
+                margin: 8px 0;
+                line-height: 1.6;
+            }
+
+            code {
+                background: var(--b3-theme-background);
+                padding: 2px 6px;
+                border-radius: 3px;
+                font-size: 12px;
+            }
+
+            a {
+                color: var(--b3-theme-primary);
+                text-decoration: none;
+
+                &:hover {
+                    text-decoration: underline;
+                }
+            }
+
+            .tip {
+                font-size: 12px;
+                color: var(--b3-theme-on-surface-light);
+                margin-top: 4px;
+            }
+        }
     }
 </style>
