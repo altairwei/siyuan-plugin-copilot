@@ -1865,7 +1865,18 @@ export default class PluginSample extends Plugin {
      * 加载设置
      */
     async loadSettings() {
-        const settings = (await this.loadData(SETTINGS_FILE)) || {};
+        let settings: any;
+        try {
+            settings = (await this.loadData(SETTINGS_FILE)) || {};
+        } catch (err) {
+            console.error('[Settings] Failed to load settings file:', err);
+            settings = {};
+        }
+
+        // 如果加载的设置为空或无效，尝试使用已保存的默认设置
+        if (!settings || typeof settings !== 'object') {
+            settings = {};
+        }
 
         // 迁移：如果存在旧的 aiProviders.v3 配置，迁移为自定义平台（customProviders）
         try {
@@ -2010,11 +2021,20 @@ export default class PluginSample extends Plugin {
 
         // 保存合并后的设置，确保内置 webApps 能在 onLayoutReady 中正确注册
         if (needsSave) {
-            await this.saveData(SETTINGS_FILE, mergedSettings);
+            try {
+                await this.saveData(SETTINGS_FILE, mergedSettings);
+            } catch (err) {
+                console.error('[Settings] Failed to save merged settings:', err);
+            }
         }
 
-        // 更新 store
-        updateSettings(mergedSettings);
+        // 更新 store，通知所有订阅者
+        try {
+            updateSettings(mergedSettings);
+        } catch (err) {
+            console.error('[Settings] Failed to update settings store:', err);
+        }
+
         return mergedSettings;
     }
 

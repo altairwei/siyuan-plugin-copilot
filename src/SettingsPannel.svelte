@@ -774,8 +774,14 @@
     });
 
     async function runload() {
-        const loadedSettings = await plugin.loadSettings();
-        settings = { ...loadedSettings };
+        try {
+            const loadedSettings = await plugin.loadSettings();
+            settings = { ...loadedSettings };
+        } catch (err) {
+            console.error('[SettingsPannel] Failed to load settings:', err);
+            // 加载失败时保留现有设置，不清空
+            return;
+        }
 
         // 确保 aiProviders 存在
         if (!settings.aiProviders) {
