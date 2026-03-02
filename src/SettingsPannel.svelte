@@ -1492,8 +1492,11 @@
         border: 1px dashed var(--b3-border-color);
         border-radius: 6px;
         color: var(--b3-theme-on-surface-light);
-        text-align: center;
-        margin: auto;
+        text-align: left;
+        margin: 0;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
     }
 
     .unified-platform-manager {
@@ -1938,12 +1941,14 @@
         margin-top: 16px;
         text-align: left;
         font-size: 13px;
+        overflow: hidden;
 
         summary {
             cursor: pointer;
             color: var(--b3-theme-primary);
             font-weight: 500;
             padding: 8px 0;
+            list-style: disclosure-closed;
 
             &:hover {
                 color: var(--b3-theme-primary-light);
@@ -1955,6 +1960,7 @@
             background: var(--b3-theme-surface);
             border-radius: 4px;
             margin-top: 8px;
+            overflow: hidden;
 
             ol, ul {
                 padding-left: 20px;
