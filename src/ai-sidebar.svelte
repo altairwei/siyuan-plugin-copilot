@@ -2652,9 +2652,9 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                 let fullText = '';
                 let thinking = '';
 
-                // 准备联网搜索工具（如果启用）
+                // 准备联网搜索工具（仅 Agent 模式下启用，与 main 分支保持一致）
                 let webSearchTools: any[] | undefined = undefined;
-                if (modelConfig.capabilities?.webSearch && modelConfig.webSearchEnabled) {
+                if (chatMode === 'agent' && modelConfig.capabilities?.webSearch && modelConfig.webSearchEnabled) {
                     const modelIdLower = modelConfig.id.toLowerCase();
 
                     if (modelIdLower.includes('gemini')) {
@@ -4147,9 +4147,9 @@ Translate the above text enclosed with <translate_input> into {outputLanguage} w
                 }
             }
 
-            // 准备联网搜索工具（如果启用）
+            // 准备联网搜索工具（仅 Agent 模式下启用）
             let webSearchTools: any[] | undefined = undefined;
-            if (modelConfig.capabilities?.webSearch && modelConfig.webSearchEnabled) {
+            if (chatMode === 'agent' && modelConfig.capabilities?.webSearch && modelConfig.webSearchEnabled) {
                 const modelIdLower = modelConfig.id.toLowerCase();
 
                 if (modelIdLower.includes('gemini')) {
